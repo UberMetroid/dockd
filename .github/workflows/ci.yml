@@ -1,0 +1,96 @@
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: build + test + invariants
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check code formatting
+        run: cargo fmt --check
+
+      - name: Lint with clippy (-D warnings)
+        run: cargo clippy -- -D warnings
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Run unit & integration tests
+        run: cargo test --all-targets
+
+      - name: Enforce Page Rule (<= 256 LOC)
+        run: |
+          violations=$(find src -name '*.rs' -exec awk 'END { if (NR > 256) print FILENAME ":" NR }' {} \;)
+          if [ -n "$violations" ]; then
+            echo "::error::Files exceed 256-LOC cap:"
+            echo "$violations"
+            exit 1
+          fi
+
+      - name: Enforce Zero-Crates Invariant
+        run: cargo test --lib qa::lint::no_crates
+
+  package:
+    name: package builds (.deb, .rpm, pkgbuild)
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm dpkg-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+
+      - name: Validate PKGBUILD syntax
+        run: bash -n packaging/arch/PKGBUILD
+
+      - name: Build Debian and RPM packages
+        run: bash packaging/build-packages.sh
+
+      - name: Verify package archives
+        run: |
+          dpkg-deb -c dist/*.deb
+          rpm -qpl dist/*.rpm
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: dist/*

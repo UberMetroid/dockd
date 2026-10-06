@@ -1,0 +1,16 @@
+Source: dockd
+Section: x11
+Priority: optional
+Maintainer: UberMetroid <ubermetroid@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13), cargo (>= 1.80), rustc (>= 1.80)
+Standards-Version: 4.6.2
+Homepage: https://github.com/UberMetroid/dockd
+Rules-Requires-Root: no
+
+Package: dockd
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, systemd
+Description: Pure-standard-library Rust application dock and window manager daemon for Omarchy
+ dockd is a high-performance desktop dock and window manager daemon for Omarchy
+ and Hyprland. Built strictly in pure-standard-library Rust with zero crates.io
+ dependencies and native systemd user session integration.

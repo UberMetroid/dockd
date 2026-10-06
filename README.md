@@ -123,19 +123,60 @@ dockd profile windows
 
 ## Installation
 
-Run the automated installer:
+### 1. Web Installer (Recommended)
+One-line automated installation for Omarchy and Hyprland desktops:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/UberMetroid/dockd/main/install.sh | bash
+```
+
+### 2. DNF / RPM (Fedora, RHEL)
+Install via the prebuilt RPM package or generate it with the built-in packaging script:
+
+```bash
+# Build the native RPM package
+bash packaging/build-packages.sh
+
+# Install with DNF
+sudo dnf install ./dist/dockd-0.1.0-1.*.rpm
+```
+
+### 3. DEB / APT (Debian, Ubuntu)
+Install via the native `.deb` package:
+
+```bash
+# Build the native Debian package
+bash packaging/build-packages.sh
+
+# Install with APT
+sudo apt install ./dist/dockd_0.1.0-1_*.deb
+```
+
+### 4. Arch Linux / Omarchy (PKGBUILD)
+Omarchy runs natively on Arch Linux. Build and install directly using `makepkg`:
+
+```bash
+cd packaging/arch
+makepkg -si
+```
+
+Or copy the plugin and binary into your local environment:
 
 ```bash
 bash install.sh
 ```
 
-Enable the systemd user socket:
+---
+
+## Enabling & Starting dockd
+
+After installation, enable the systemd socket activation unit (zero idle resource usage when not in use):
 
 ```bash
 systemctl --user enable --now dockd.socket
 ```
 
-Enable the plugin in Omarchy:
+Enable the plugin inside Omarchy:
 
 ```bash
 omarchy plugin enable org.ubermetroid.dockd

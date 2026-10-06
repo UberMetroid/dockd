@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_build:
+	cargo build --release
+
+override_dh_auto_test:
+	cargo test
+
+override_dh_auto_install:
+	install -Dm755 target/release/dockd debian/dockd/usr/bin/dockd
+	install -Dm644 systemd/user/dockd.service debian/dockd/usr/lib/systemd/user/dockd.service
+	install -Dm644 systemd/user/dockd.socket debian/dockd/usr/lib/systemd/user/dockd.socket
+	install -d -m0755 debian/dockd/usr/share/omarchy/plugins/org.ubermetroid.dockd
+	cp -rf plugin/* debian/dockd/usr/share/omarchy/plugins/org.ubermetroid.dockd/
