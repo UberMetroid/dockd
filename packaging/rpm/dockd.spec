@@ -1,3 +1,5 @@
+%{!?_userunitdir: %global _userunitdir %{_prefix}/lib/systemd/user}
+
 Name:           dockd
 Version:        0.1.0
 Release:        1%{?dist}
@@ -38,13 +40,13 @@ install -d -m 0755 %{buildroot}%{_datadir}/omarchy/plugins/org.ubermetroid.dockd
 cp -rf plugin/* %{buildroot}%{_datadir}/omarchy/plugins/org.ubermetroid.dockd/
 
 %post
-%systemd_user_post dockd.socket
+%{?systemd_user_post: %systemd_user_post dockd.socket}
 
 %preun
-%systemd_user_preun dockd.socket dockd.service
+%{?systemd_user_preun: %systemd_user_preun dockd.socket dockd.service}
 
 %postun
-%systemd_user_postun_with_restart dockd.socket
+%{?systemd_user_postun_with_restart: %systemd_user_postun_with_restart dockd.socket}
 
 %files
 %license LICENSE

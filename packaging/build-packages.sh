@@ -69,7 +69,7 @@ if command -v rpmbuild >/dev/null 2>&1; then
 
     cp "${SCRIPT_DIR}/rpm/dockd.spec" "${RPM_TOP}/SPECS/"
 
-    rpmbuild --define "_topdir ${RPM_TOP}" -bb "${RPM_TOP}/SPECS/dockd.spec"
+    rpmbuild --nodeps --define "_topdir ${RPM_TOP}" -bb "${RPM_TOP}/SPECS/dockd.spec"
 
     find "${RPM_TOP}/RPMS" -name "*.rpm" -exec cp {} "${OUT_DIR}/" \;
     echo "==> RPM packages copied to ${OUT_DIR}/"
