@@ -1,0 +1,28 @@
+[package]
+name = "dockd"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Pure-standard-library Rust application dock and window manager daemon for Omarchy and Hyprland. Zero external crates."
+license = "GPL-2.0-or-later"
+publish = false
+repository = "https://github.com/UberMetroid/dockd"
+
+[lib]
+name = "dockd"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dockd"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = false
+strip = "symbols"
+panic = "abort"
+
+[profile.dev]
+opt-level = 0

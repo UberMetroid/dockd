@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "org.ubermetroid.dockd",
+  "name": "dockd",
+  "version": "0.1.0",
+  "author": "UberMetroid",
+  "license": "GPL-2.0-or-later",
+  "description": "High-performance native app dock and window manager daemon for Omarchy",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "DockPanel.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "dockd",
+    "description": "App dock and window manager controls",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

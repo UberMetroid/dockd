@@ -1,0 +1,11 @@
+[Unit]
+Description=dockd — Socket Activation for Omarchy App Dock Daemon
+PartOf=graphical-session.target
+
+[Socket]
+ListenStream=%t/dockd.sock
+SocketMode=0600
+Service=dockd.service
+
+[Install]
+WantedBy=sockets.target

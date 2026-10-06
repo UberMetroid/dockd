@@ -1,0 +1,25 @@
+[Unit]
+Description=dockd — Omarchy App Dock & Window Manager Daemon
+Documentation=https://github.com/UberMetroid/dockd
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+WatchdogSec=30s
+ExecStart=%h/.local/bin/dockd --daemon
+Restart=on-failure
+RestartSec=2s
+Slice=session.slice
+
+# Sandboxing and System Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%t %h/.config/omarchy
+PrivateTmp=true
+PrivateDevices=false
+
+[Install]
+WantedBy=graphical-session.target
