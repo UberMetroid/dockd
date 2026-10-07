@@ -12,7 +12,7 @@ Item {
     implicitHeight: 28
 
     property string profile: "general"
-    property string helperPath: Qt.resolvedUrl("../target/release/dockd").toString().replace(/^file:\/\//, "")
+    property string helperPath: (typeof Quickshell !== "undefined" && Quickshell.env("DOCKD_BIN")) ? Quickshell.env("DOCKD_BIN") : "dockd"
 
     Rectangle {
         id: buttonPlate

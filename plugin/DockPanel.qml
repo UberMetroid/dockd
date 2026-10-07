@@ -16,6 +16,7 @@ PanelWindow {
     // Dock configuration state
     property string profile: "general"
     property bool fileShortcuts: true
+    property bool autoHide: false
     property bool dockVisible: true
     property var dockItems: []
     property string activeAddress: ""
@@ -34,7 +35,7 @@ PanelWindow {
 
     color: "transparent"
 
-    readonly property bool isDockHidden: settingsPopup.autoHide && root.overlap && !dockHoverArea.containsMouse
+    readonly property bool isDockHidden: root.autoHide && root.overlap && !dockHoverArea.containsMouse
 
     // Background pill/taskbar styling
     Rectangle {
@@ -165,6 +166,7 @@ PanelWindow {
         id: settingsPopup
         currentProfile: root.profile
         showFileShortcuts: root.fileShortcuts
+        autoHide: root.autoHide
         filterCurrentMonitor: root.filterMonitor
         onProfileChanged: function(p) {
             root.profile = p
@@ -172,6 +174,9 @@ PanelWindow {
         }
         onFileShortcutsToggled: function(enabled) {
             root.fileShortcuts = enabled
+        }
+        onAutoHideToggled: function(enabled) {
+            root.autoHide = enabled
         }
         onFilterCurrentMonitorToggled: function(enabled) {
             root.filterMonitor = enabled
@@ -188,7 +193,7 @@ PanelWindow {
     Item {
         id: dockRpc
 
-        property string helperPath: Qt.resolvedUrl("../target/release/dockd").toString().replace(/^file:\/\//, "")
+        property string helperPath: (typeof Quickshell !== "undefined" && Quickshell.env("DOCKD_BIN")) ? Quickshell.env("DOCKD_BIN") : "dockd"
         property var pendingActions: []
 
         function sendAction(actionName, params) {

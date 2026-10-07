@@ -80,11 +80,13 @@ impl ThemePalette {
 }
 
 pub fn load_omarchy_theme() -> ThemePalette {
-    let Ok(home) = std::env::var("HOME") else {
+    let omarchy_dir = if let Ok(config_home) = std::env::var("XDG_CONFIG_HOME") {
+        PathBuf::from(config_home).join("omarchy")
+    } else if let Ok(home) = std::env::var("HOME") {
+        PathBuf::from(home).join(".config/omarchy")
+    } else {
         return ThemePalette::default();
     };
-
-    let omarchy_dir = PathBuf::from(home).join(".config/omarchy");
 
     // 1. Try theme files in current/theme/
     let theme_candidates = [
@@ -106,6 +108,13 @@ pub fn load_omarchy_theme() -> ThemePalette {
 fn try_load_file(path: &Path) -> Option<ThemePalette> {
     let content = fs::read_to_string(path).ok()?;
     let json = parse(&content).ok()?;
+
+    if let Some(theme) = json.get("theme") {
+        if let Some(colors) = theme.get("colors").or_else(|| theme.get("palette")) {
+            return Some(ThemePalette::from_json(colors));
+        }
+        return Some(ThemePalette::from_json(theme));
+    }
 
     if let Some(colors) = json.get("colors").or_else(|| json.get("palette")) {
         return Some(ThemePalette::from_json(colors));

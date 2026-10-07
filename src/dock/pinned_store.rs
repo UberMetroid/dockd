@@ -9,7 +9,9 @@ use std::fs;
 use std::path::PathBuf;
 
 pub fn config_path() -> PathBuf {
-    if let Ok(config_home) = std::env::var("XDG_CONFIG_HOME") {
+    if let Ok(path) = std::env::var("DOCKD_CONFIG_PATH") {
+        PathBuf::from(path)
+    } else if let Ok(config_home) = std::env::var("XDG_CONFIG_HOME") {
         PathBuf::from(config_home)
             .join("omarchy")
             .join("dockd-pinned.json")
@@ -68,7 +70,6 @@ pub fn reorder_pinned_ids(ids: &mut Vec<String>, desktop_id: &str, target_idx: u
     let item = ids.remove(old_idx);
     let clamped_idx = target_idx.min(ids.len());
     ids.insert(clamped_idx, item);
-    save_pinned_ids(ids);
     true
 }
 

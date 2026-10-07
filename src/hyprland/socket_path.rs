@@ -5,13 +5,17 @@
 use crate::system::error_status::DockError;
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 #[derive(Debug, Clone)]
 pub struct HyprlandSockets {
     pub command_socket: PathBuf,
     pub event_socket: PathBuf,
+}
+
+fn is_socket_live(path: &Path) -> bool {
+    std::os::unix::net::UnixStream::connect(path).is_ok()
 }
 
 pub fn locate_sockets() -> Result<HyprlandSockets, DockError> {
@@ -22,12 +26,12 @@ pub fn locate_sockets() -> Result<HyprlandSockets, DockError> {
 
     let hypr_base = PathBuf::from(runtime_dir).join("hypr");
 
-    // 1. Try explicit HYPRLAND_INSTANCE_SIGNATURE from environment
+    // 1. Try explicit HYPRLAND_INSTANCE_SIGNATURE from environment if live
     if let Ok(signature) = env::var("HYPRLAND_INSTANCE_SIGNATURE") {
         let candidate = hypr_base.join(&signature);
         let cmd = candidate.join(".socket.sock");
         let ev = candidate.join(".socket2.sock");
-        if cmd.exists() && ev.exists() {
+        if cmd.exists() && ev.exists() && is_socket_live(&cmd) {
             return Ok(HyprlandSockets {
                 command_socket: cmd,
                 event_socket: ev,
@@ -37,7 +41,8 @@ pub fn locate_sockets() -> Result<HyprlandSockets, DockError> {
 
     // 2. Discover active instance directories under $XDG_RUNTIME_DIR/hypr
     if let Ok(entries) = fs::read_dir(&hypr_base) {
-        let mut best_match: Option<(SystemTime, PathBuf, PathBuf)> = None;
+        let mut best_live: Option<(SystemTime, PathBuf, PathBuf)> = None;
+        let mut best_fallback: Option<(SystemTime, PathBuf, PathBuf)> = None;
 
         for entry in entries.flatten() {
             let path = entry.path();
@@ -50,19 +55,24 @@ pub fn locate_sockets() -> Result<HyprlandSockets, DockError> {
                 let mtime = fs::metadata(&cmd)
                     .and_then(|m| m.modified())
                     .unwrap_or(SystemTime::UNIX_EPOCH);
-                match &best_match {
+                let target = if is_socket_live(&cmd) {
+                    &mut best_live
+                } else {
+                    &mut best_fallback
+                };
+                match target {
                     Some((best_time, _, _)) if mtime > *best_time => {
-                        best_match = Some((mtime, cmd, ev));
+                        *target = Some((mtime, cmd, ev));
                     }
                     None => {
-                        best_match = Some((mtime, cmd, ev));
+                        *target = Some((mtime, cmd, ev));
                     }
                     _ => {}
                 }
             }
         }
 
-        if let Some((_, command_socket, event_socket)) = best_match {
+        if let Some((_, command_socket, event_socket)) = best_live.or(best_fallback) {
             return Ok(HyprlandSockets {
                 command_socket,
                 event_socket,

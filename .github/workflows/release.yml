@@ -46,7 +46,8 @@ jobs:
       - name: Generate SHA256SUMS
         run: |
           cd dist
-          sha256sum * > SHA256SUMS
+          rm -f SHA256SUMS
+          sha256sum dockd* > SHA256SUMS
           cat SHA256SUMS
 
       - name: Publish GitHub Release

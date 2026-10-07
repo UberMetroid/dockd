@@ -64,28 +64,26 @@ if command -v omarchy >/dev/null 2>&1; then
     omarchy plugin disable org.ubermetroid.dockd 2>/dev/null || true
 fi
 
-# 4. Remove installed binaries
+# 4. Remove installed dockd binary
 BIN_TARGET="${HOME}/.local/bin"
 if [ -f "${BIN_TARGET}/dockd" ]; then
     info "Removing binary ${BIN_TARGET}/dockd..."
     rm -f "${BIN_TARGET}/dockd"
 fi
-if [ -f "${BIN_TARGET}/dockd-uninstall" ]; then
-    info "Removing helper ${BIN_TARGET}/dockd-uninstall..."
-    rm -f "${BIN_TARGET}/dockd-uninstall"
-fi
 
-# 5. Remove Omarchy plugin directory
-PLUGIN_TARGET="${HOME}/.config/omarchy/plugins/org.ubermetroid.dockd"
-if [ -d "${PLUGIN_TARGET}" ]; then
-    info "Removing plugin directory ${PLUGIN_TARGET}..."
-    rm -rf "${PLUGIN_TARGET}"
-fi
-
-# 6. Remove systemd user unit files
+# 5. Remove systemd user unit files
 SYSTEMD_TARGET="${HOME}/.config/systemd/user"
 rm -f "${SYSTEMD_TARGET}/dockd.service"
 rm -f "${SYSTEMD_TARGET}/dockd.socket"
+rm -rf "${SYSTEMD_TARGET}/dockd.service.d"
+rm -rf "${SYSTEMD_TARGET}/dockd.socket.d"
+
+# 6. Reload systemd user daemon
+if command -v systemctl >/dev/null 2>&1; then
+    info "Reloading systemd user daemon..."
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user reset-failed 2>/dev/null || true
+fi
 
 # 7. Optional removal of user configuration / preferences
 CONFIG_FILE="${HOME}/.config/omarchy/dockd-pinned.json"
@@ -110,11 +108,21 @@ if [ -f "${CONFIG_FILE}" ]; then
     fi
 fi
 
-# 8. Reload systemd user daemon
-if command -v systemctl >/dev/null 2>&1; then
-    info "Reloading systemd user daemon..."
-    systemctl --user daemon-reload 2>/dev/null || true
-    systemctl --user reset-failed 2>/dev/null || true
+# 8. Remove Omarchy plugin directory
+PLUGIN_TARGET="${HOME}/.config/omarchy/plugins/org.ubermetroid.dockd"
+if [ -d "${PLUGIN_TARGET}" ]; then
+    info "Removing plugin directory ${PLUGIN_TARGET}..."
+    rm -rf "${PLUGIN_TARGET}"
+fi
+
+# 9. Clean up uninstaller helper and notify about system packages
+if [ -f "${BIN_TARGET}/dockd-uninstall" ]; then
+    rm -f "${BIN_TARGET}/dockd-uninstall"
+fi
+
+if [ -f "/usr/bin/dockd" ]; then
+    warn "A system-wide dockd package is also installed in /usr/bin/dockd."
+    warn "To remove it, use your package manager (e.g. sudo apt/dnf/pacman remove dockd)."
 fi
 
 ok "dockd has been completely uninstalled from this system."

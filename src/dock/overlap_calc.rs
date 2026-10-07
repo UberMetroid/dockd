@@ -39,8 +39,8 @@ pub fn calculate_window_overlap(
             continue;
         }
 
-        // Only windows on the current active workspace (or floating/fullscreen) can overlap
-        if client.workspace_id != active_workspace_id && !client.floating {
+        // Only windows on the current active workspace can overlap
+        if client.workspace_id != active_workspace_id {
             continue;
         }
 
@@ -93,6 +93,12 @@ mod tests {
 
         // Different workspace should not overlap
         assert!(!calculate_window_overlap(&[client.clone()], 2, dock));
+
+        // Floating window on different workspace should not overlap
+        let mut float_other_ws = client.clone();
+        float_other_ws.floating = true;
+        float_other_ws.workspace_id = 2;
+        assert!(!calculate_window_overlap(&[float_other_ws], 1, dock));
 
         // Minimized should not overlap
         client.hidden = true;

@@ -87,7 +87,10 @@ Popup {
         CheckBox {
             text: "Auto-hide on window overlap"
             checked: root.autoHide
-            onToggled: root.autoHideToggled(checked)
+            onToggled: {
+                root.autoHide = checked
+                root.autoHideToggled(checked)
+            }
         }
 
         CheckBox {

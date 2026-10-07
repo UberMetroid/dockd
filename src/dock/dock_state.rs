@@ -76,7 +76,7 @@ impl DockState {
                 if matches {
                     matched_clients.insert(idx);
                     let urg = self.is_address_urgent(&client.address);
-                    windows.push(summarize_window(client, active_addr, urg));
+                    windows.push(WindowSummary::from_client(client, active_addr, urg));
                 }
             }
 
@@ -120,7 +120,7 @@ impl DockState {
             let wm_class = client.class.clone();
 
             let urg = self.is_address_urgent(&client.address);
-            let win = summarize_window(client, active_addr, urg);
+            let win = WindowSummary::from_client(client, active_addr, urg);
 
             if let Some(existing) = new_items
                 .iter_mut()
@@ -170,7 +170,11 @@ impl DockState {
     }
 
     pub fn reorder_pin(&mut self, desktop_id: &str, target_idx: usize) -> bool {
-        reorder_pinned_ids(&mut self.pinned_ids, desktop_id, target_idx)
+        let changed = reorder_pinned_ids(&mut self.pinned_ids, desktop_id, target_idx);
+        if changed {
+            save_pinned_ids(&self.pinned_ids);
+        }
+        changed
     }
 
     pub fn mark_urgent(&mut self, addr: &str) {
@@ -203,47 +207,43 @@ impl DockState {
 
     pub fn to_json(&self) -> JsonValue {
         let mut map = BTreeMap::new();
-        map.insert(
-            "profile".to_string(),
-            JsonValue::String(self.profile.clone()),
-        );
-        let active = match &self.active_address {
-            Some(a) => JsonValue::String(a.clone()),
-            None => JsonValue::Null,
-        };
-        map.insert("active_address".to_string(), active);
-
-        let filter_mon = match self.filter_monitor {
-            Some(m) => JsonValue::Number(m as f64),
-            None => JsonValue::Null,
-        };
-        map.insert("filter_monitor".to_string(), filter_mon);
-        map.insert("overlap".to_string(), JsonValue::Bool(self.overlap));
-        map.insert("theme".to_string(), self.theme.to_json());
-
-        let items_json: Vec<JsonValue> = self.items.iter().map(DockItem::to_json).collect();
-        map.insert("items".to_string(), JsonValue::Array(items_json));
-
+        map.insert("profile".into(), JsonValue::String(self.profile.clone()));
+        let active = self
+            .active_address
+            .as_ref()
+            .map_or(JsonValue::Null, |a| JsonValue::String(a.clone()));
+        map.insert("active_address".into(), active);
+        let filter_mon = self
+            .filter_monitor
+            .map_or(JsonValue::Null, |m| JsonValue::Number(m as f64));
+        map.insert("filter_monitor".into(), filter_mon);
+        map.insert("overlap".into(), JsonValue::Bool(self.overlap));
+        map.insert("theme".into(), self.theme.to_json());
+        let items: Vec<JsonValue> = self.items.iter().map(DockItem::to_json).collect();
+        map.insert("items".into(), JsonValue::Array(items));
         JsonValue::Object(map)
     }
 }
 
-fn summarize_window(
-    client: &HyprClient,
-    active_addr: Option<&str>,
-    is_urgent: bool,
-) -> WindowSummary {
-    let is_focused =
-        active_addr.is_some_and(|a| normalize_addr(a) == normalize_addr(&client.address));
-    WindowSummary {
-        address: client.address.clone(),
-        title: client.title.clone(),
-        workspace_id: client.workspace_id,
-        workspace_name: client.workspace_name.clone(),
-        minimized: client.is_minimized(),
-        floating: client.floating,
-        focused: is_focused,
-        urgent: is_urgent,
-        pid: client.pid,
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_urgency_tracking() {
+        let mut state = DockState::new();
+        state.mark_urgent("0x559e2a80");
+        assert!(state.is_address_urgent("0x559e2a80"));
+        assert!(state.is_address_urgent("559e2a80"));
+        state.clear_urgent("559e2a80");
+        assert!(!state.is_address_urgent("0x559e2a80"));
+    }
+
+    #[test]
+    fn test_filter_monitor() {
+        let mut state = DockState::new();
+        assert_eq!(state.filter_monitor, None);
+        state.set_filter_monitor(Some(1));
+        assert_eq!(state.filter_monitor, Some(1));
     }
 }

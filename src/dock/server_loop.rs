@@ -67,9 +67,13 @@ pub fn run_daemon() -> Result<(), DockError> {
                 match listener.next_event() {
                     Ok(Some(ev)) => match ev {
                         HyprEvent::WindowOpened(_)
-                        | HyprEvent::WindowClosed(_)
                         | HyprEvent::WorkspaceChanged(_)
                         | HyprEvent::MonitorChanged => {
+                            refresh_hypr_state(&mut state, hypr_cmd_sock.as_deref());
+                            changed = true;
+                        }
+                        HyprEvent::WindowClosed(addr) => {
+                            state.clear_urgent(&addr);
                             refresh_hypr_state(&mut state, hypr_cmd_sock.as_deref());
                             changed = true;
                         }
@@ -149,7 +153,9 @@ fn refresh_hypr_state(state: &mut DockState, cmd_sock: Option<&Path>) {
         if let Some(mon) = active_mon {
             let dock_rect =
                 default_dock_rect(mon.x, mon.y, mon.width, mon.height, state.items.len());
-            let active_ws = active.map(|a| a.workspace_id).unwrap_or(1);
+            let active_ws = active
+                .map(|a| a.workspace_id)
+                .unwrap_or(mon.active_workspace_id);
             state.overlap = calculate_window_overlap(&clients, active_ws, dock_rect);
         }
     }

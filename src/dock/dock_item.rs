@@ -2,6 +2,7 @@
 //!
 //! Encapsulates launcher identity, running window instances, badges, urgency, and layout metadata.
 
+use crate::hyprland::client_table::{HyprClient, normalize_addr};
 use crate::syntax::json_value::JsonValue;
 use std::collections::BTreeMap;
 
@@ -19,6 +20,22 @@ pub struct WindowSummary {
 }
 
 impl WindowSummary {
+    pub fn from_client(client: &HyprClient, active_addr: Option<&str>, is_urgent: bool) -> Self {
+        let is_focused =
+            active_addr.is_some_and(|a| normalize_addr(a) == normalize_addr(&client.address));
+        Self {
+            address: client.address.clone(),
+            title: client.title.clone(),
+            workspace_id: client.workspace_id,
+            workspace_name: client.workspace_name.clone(),
+            minimized: client.is_minimized(),
+            floating: client.floating,
+            focused: is_focused,
+            urgent: is_urgent,
+            pid: client.pid,
+        }
+    }
+
     pub fn to_json(&self) -> JsonValue {
         let mut map = BTreeMap::new();
         map.insert(

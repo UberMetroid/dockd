@@ -211,6 +211,13 @@ Item {
                     radius: 4
                     color: winRowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : (modelData.focused ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
 
+                    MouseArea {
+                        id: winRowMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: root.focusWindow(modelData.address)
+                    }
+
                     RowLayout {
                         anchors.fill: parent
                         anchors.margins: 4
@@ -237,10 +244,19 @@ Item {
                             font.pixelSize: 9
                         }
 
-                        Text {
-                            text: "✕"
-                            color: winCloseMouse.containsMouse ? "#ef4444" : ((root.theme && root.theme.muted) ? root.theme.muted : "#94a3b8")
-                            font.pixelSize: 10
+                        Rectangle {
+                            width: 16
+                            height: 16
+                            radius: 8
+                            color: winCloseMouse.containsMouse ? Qt.rgba(1, 0, 0, 0.2) : "transparent"
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "✕"
+                                color: winCloseMouse.containsMouse ? "#ef4444" : ((root.theme && root.theme.muted) ? root.theme.muted : "#94a3b8")
+                                font.pixelSize: 10
+                            }
+
                             MouseArea {
                                 id: winCloseMouse
                                 anchors.fill: parent
@@ -248,13 +264,6 @@ Item {
                                 onClicked: root.closeWindow(modelData.address)
                             }
                         }
-                    }
-
-                    MouseArea {
-                        id: winRowMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onClicked: root.focusWindow(modelData.address)
                     }
                 }
             }

@@ -14,6 +14,7 @@ pub struct HyprMonitor {
     pub y: i64,
     pub scale: f64,
     pub focused: bool,
+    pub active_workspace_id: i64,
     pub reserved: [i64; 4], // [top, bottom, left, right]
 }
 
@@ -27,6 +28,11 @@ impl HyprMonitor {
         let y = val.get_i64("y").unwrap_or(0);
         let scale = val.get_f64("scale").unwrap_or(1.0);
         let focused = val.get_bool("focused").unwrap_or(false);
+        let active_workspace_id = val
+            .get("activeWorkspace")
+            .and_then(|w| w.get_i64("id"))
+            .or_else(|| val.get_i64("activeWorkspace"))
+            .unwrap_or(1);
 
         let mut reserved = [0i64; 4];
         if let Some(res_arr) = val.get("reserved").and_then(JsonValue::as_array) {
@@ -44,6 +50,7 @@ impl HyprMonitor {
             y,
             scale,
             focused,
+            active_workspace_id,
             reserved,
         })
     }

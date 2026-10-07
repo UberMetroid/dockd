@@ -77,7 +77,9 @@ impl SocketServer {
                     let resp = match parse(trimmed) {
                         Ok(req) => match execute_action(&req, state, hypr_cmd_sock) {
                             Ok(res) => {
-                                state_changed = true;
+                                if req.get_str("action") != Some("get_state") {
+                                    state_changed = true;
+                                }
                                 res
                             }
                             Err(e) => json_err(&e.to_string()),

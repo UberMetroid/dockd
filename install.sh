@@ -12,18 +12,26 @@ RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 RELEASE_BASE="https://github.com/${REPO}/releases/latest/download"
 
 # Support --uninstall flag directly
+UNINSTALL=0
+UNINSTALL_ARGS=()
 for arg in "$@"; do
     if [ "$arg" = "--uninstall" ]; then
-        shift
-        if [ -f "$(dirname "${BASH_SOURCE[0]:-$0}")/uninstall.sh" ]; then
-            exec "$(dirname "${BASH_SOURCE[0]:-$0}")/uninstall.sh" "$@"
-        else
-            echo "Fetching uninstaller from ${REPO}..."
-            curl -fsSL "${RAW_BASE}/uninstall.sh" | bash -s -- "$@"
-            exit $?
-        fi
+        UNINSTALL=1
+    else
+        UNINSTALL_ARGS+=("$arg")
     fi
 done
+
+if [ "$UNINSTALL" -eq 1 ]; then
+    SCRIPT_DIR_CANDIDATE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null || echo ".")"
+    if [ -f "${SCRIPT_DIR_CANDIDATE}/uninstall.sh" ]; then
+        exec "${SCRIPT_DIR_CANDIDATE}/uninstall.sh" "${UNINSTALL_ARGS[@]}"
+    else
+        echo "Fetching uninstaller from ${REPO}..."
+        curl -fsSL "${RAW_BASE}/uninstall.sh" | bash -s -- "${UNINSTALL_ARGS[@]}"
+        exit $?
+    fi
+fi
 
 BIN_TARGET="${HOME}/.local/bin"
 PLUGIN_TARGET="${HOME}/.config/omarchy/plugins/org.ubermetroid.dockd"
@@ -75,7 +83,8 @@ if [ "${IS_LOCAL}" -eq 1 ]; then
     info "Installing clean uninstaller..."
     cp -f "${SCRIPT_DIR}/uninstall.sh" "${PLUGIN_TARGET}/uninstall.sh"
     chmod +x "${PLUGIN_TARGET}/uninstall.sh"
-    ln -sf "${PLUGIN_TARGET}/uninstall.sh" "${BIN_TARGET}/dockd-uninstall"
+    cp -f "${SCRIPT_DIR}/uninstall.sh" "${BIN_TARGET}/dockd-uninstall"
+    chmod +x "${BIN_TARGET}/dockd-uninstall"
 else
     info "Running web installer from ${REPO}..."
     ARCH=$(uname -m)
@@ -115,7 +124,8 @@ else
     info "Fetching clean uninstaller..."
     curl -fsSL -o "${PLUGIN_TARGET}/uninstall.sh" "${RAW_BASE}/uninstall.sh"
     chmod +x "${PLUGIN_TARGET}/uninstall.sh"
-    ln -sf "${PLUGIN_TARGET}/uninstall.sh" "${BIN_TARGET}/dockd-uninstall"
+    cp -f "${PLUGIN_TARGET}/uninstall.sh" "${BIN_TARGET}/dockd-uninstall"
+    chmod +x "${BIN_TARGET}/dockd-uninstall"
 fi
 
 chmod +x "${BIN_TARGET}/dockd"

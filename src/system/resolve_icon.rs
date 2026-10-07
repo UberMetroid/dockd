@@ -17,14 +17,15 @@ const PREFERRED_SIZES: &[&str] = &[
 ];
 
 pub fn detect_active_icon_theme() -> Option<String> {
-    let Ok(home) = std::env::var("HOME") else {
-        return None;
-    };
-
-    let candidates = [
-        PathBuf::from(&home).join(".config/gtk-3.0/settings.ini"),
-        PathBuf::from(&home).join(".config/gtk-4.0/settings.ini"),
-    ];
+    let mut candidates = Vec::new();
+    if let Ok(config_home) = std::env::var("XDG_CONFIG_HOME") {
+        candidates.push(PathBuf::from(&config_home).join("gtk-3.0/settings.ini"));
+        candidates.push(PathBuf::from(&config_home).join("gtk-4.0/settings.ini"));
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        candidates.push(PathBuf::from(&home).join(".config/gtk-3.0/settings.ini"));
+        candidates.push(PathBuf::from(&home).join(".config/gtk-4.0/settings.ini"));
+    }
 
     for path in &candidates {
         let Ok(content) = fs::read_to_string(path) else {
@@ -57,6 +58,9 @@ pub fn resolve_icon_path(icon_name: &str) -> Option<String> {
     }
 
     let mut base_dirs = Vec::new();
+    if let Ok(data_home) = std::env::var("XDG_DATA_HOME") {
+        base_dirs.push(PathBuf::from(data_home).join("icons"));
+    }
     if let Ok(home) = std::env::var("HOME") {
         base_dirs.push(PathBuf::from(home).join(".local/share/icons"));
     }
