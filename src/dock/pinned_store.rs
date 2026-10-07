@@ -27,11 +27,73 @@ pub fn config_path() -> PathBuf {
 
 pub fn default_pinned() -> Vec<String> {
     vec![
-        "firefox.desktop".to_string(),
-        "org.wezfurlong.wezterm.desktop".to_string(),
-        "nautilus.desktop".to_string(),
-        "code.desktop".to_string(),
+        find_default_file_manager(),
+        find_default_browser(),
+        find_default_terminal(),
     ]
+}
+
+fn find_default_file_manager() -> String {
+    let candidates = [
+        "nautilus.desktop",
+        "org.gnome.Nautilus.desktop",
+        "thunar.desktop",
+        "dolphin.desktop",
+        "pcmanfm.desktop",
+    ];
+    candidates
+        .into_iter()
+        .find(|c| desktop_exists(c))
+        .unwrap_or("nautilus.desktop")
+        .to_string()
+}
+
+fn find_default_browser() -> String {
+    let candidates = [
+        "firefox.desktop",
+        "zen-browser.desktop",
+        "google-chrome.desktop",
+        "brave-browser.desktop",
+        "chromium-browser.desktop",
+    ];
+    candidates
+        .into_iter()
+        .find(|c| desktop_exists(c))
+        .unwrap_or("firefox.desktop")
+        .to_string()
+}
+
+fn find_default_terminal() -> String {
+    let candidates = [
+        "alacritty.desktop",
+        "foot.desktop",
+        "org.wezfurlong.wezterm.desktop",
+        "kitty.desktop",
+        "ghostty.desktop",
+    ];
+    candidates
+        .into_iter()
+        .find(|c| desktop_exists(c))
+        .unwrap_or("alacritty.desktop")
+        .to_string()
+}
+
+fn desktop_exists(id: &str) -> bool {
+    let dirs = ["/usr/share/applications", "/usr/local/share/applications"];
+    for d in dirs {
+        if std::path::Path::new(d).join(id).exists() {
+            return true;
+        }
+    }
+    if let Ok(home) = std::env::var("HOME")
+        && std::path::Path::new(&home)
+            .join(".local/share/applications")
+            .join(id)
+            .exists()
+    {
+        return true;
+    }
+    false
 }
 
 pub fn load_pinned_ids() -> Vec<String> {

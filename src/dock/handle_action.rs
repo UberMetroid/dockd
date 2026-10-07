@@ -29,6 +29,11 @@ pub fn execute_action(
             state.set_profile(prof);
             Ok(json_ok("Profile updated"))
         }
+        "set_autohide" => {
+            let enabled = req.get_bool("enabled").unwrap_or(true);
+            state.set_autohide(enabled);
+            Ok(json_ok("Autohide updated"))
+        }
         "pin" => {
             let id = req
                 .get_str("desktop_id")

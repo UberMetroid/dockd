@@ -7,6 +7,10 @@ OUT_DIR="${ROOT_DIR}/dist"
 
 mkdir -p "${OUT_DIR}"
 
+VERSION=$(grep '^version = ' "${ROOT_DIR}/Cargo.toml" | head -n 1 | cut -d '"' -f 2)
+PKG_REL="1"
+echo "==> Packaging dockd v${VERSION}-${PKG_REL}..."
+
 echo "==> Building dockd release binary..."
 cd "${ROOT_DIR}"
 cargo build --release
@@ -42,7 +46,7 @@ if command -v dpkg-deb >/dev/null 2>&1; then
 
     cat <<EOF > "${DEB_ROOT}/DEBIAN/control"
 Package: dockd
-Version: 0.1.0-1
+Version: ${VERSION}-${PKG_REL}
 Section: x11
 Priority: optional
 Architecture: ${DEB_ARCH}
@@ -54,8 +58,8 @@ Description: Pure-standard-library Rust application dock and window manager daem
  dependencies and native systemd user session integration.
 EOF
 
-    dpkg-deb --build --root-owner-group "${DEB_ROOT}" "${OUT_DIR}/dockd_0.1.0-1_${DEB_ARCH}.deb"
-    echo "==> Created: ${OUT_DIR}/dockd_0.1.0-1_${DEB_ARCH}.deb"
+    dpkg-deb --build --root-owner-group "${DEB_ROOT}" "${OUT_DIR}/dockd_${VERSION}-${PKG_REL}_${DEB_ARCH}.deb"
+    echo "==> Created: ${OUT_DIR}/dockd_${VERSION}-${PKG_REL}_${DEB_ARCH}.deb"
 fi
 
 # 2. Build RPM (.rpm) package
@@ -67,10 +71,11 @@ if command -v rpmbuild >/dev/null 2>&1; then
     mkdir -p "${RPM_TOP}/"{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
     # Tar source directory
-    TARBALL="${RPM_TOP}/SOURCES/dockd-0.1.0.tar.gz"
-    tar --exclude='.git' --exclude='target' --exclude='dist' -czf "${TARBALL}" -C "${ROOT_DIR}/.." dockd --transform 's,^dockd,dockd-0.1.0,'
+    TARBALL="${RPM_TOP}/SOURCES/dockd-${VERSION}.tar.gz"
+    tar --exclude='.git' --exclude='target' --exclude='dist' -czf "${TARBALL}" -C "${ROOT_DIR}/.." dockd --transform "s,^dockd,dockd-${VERSION},"
 
     cp "${SCRIPT_DIR}/rpm/dockd.spec" "${RPM_TOP}/SPECS/"
+    sed -i "s/^Version:.*/Version:        ${VERSION}/" "${RPM_TOP}/SPECS/dockd.spec"
 
     rpmbuild --nodeps --define "_topdir ${RPM_TOP}" -bb "${RPM_TOP}/SPECS/dockd.spec"
 

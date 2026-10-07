@@ -1,6 +1,6 @@
 # Maintainer: UberMetroid <ubermetroid@users.noreply.github.com>
 pkgname=dockd
-pkgver=0.1.0
+pkgver=0.1.2
 pkgrel=1
 pkgdesc="Pure-standard-library Rust application dock and window manager daemon for Omarchy & Hyprland"
 arch=('x86_64' 'aarch64')

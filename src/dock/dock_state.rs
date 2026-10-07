@@ -21,6 +21,8 @@ pub struct DockState {
     pub urgent_addresses: BTreeSet<String>,
     pub filter_monitor: Option<i64>,
     pub overlap: bool,
+    pub has_windows: bool,
+    pub autohide: bool,
     pub theme: ThemePalette,
 }
 
@@ -41,6 +43,8 @@ impl DockState {
             urgent_addresses: BTreeSet::new(),
             filter_monitor: None,
             overlap: false,
+            has_windows: false,
+            autohide: true,
             theme: load_omarchy_theme(),
         };
         state.rebuild_items(&[], None);
@@ -52,6 +56,9 @@ impl DockState {
         if let Some(active) = active_addr {
             self.clear_urgent(active);
         }
+        self.has_windows = clients
+            .iter()
+            .any(|c| c.mapped && !c.hidden && !c.is_minimized());
 
         let mut new_items = Vec::new();
         let mut matched_clients = BTreeSet::new();
@@ -149,24 +156,22 @@ impl DockState {
     }
 
     pub fn pin(&mut self, desktop_id: &str) -> bool {
-        if !self.pinned_ids.iter().any(|id| id == desktop_id) {
-            self.pinned_ids.push(desktop_id.to_string());
-            save_pinned_ids(&self.pinned_ids);
-            true
-        } else {
-            false
+        if self.pinned_ids.iter().any(|id| id == desktop_id) {
+            return false;
         }
+        self.pinned_ids.push(desktop_id.to_string());
+        save_pinned_ids(&self.pinned_ids);
+        true
     }
 
     pub fn unpin(&mut self, desktop_id: &str) -> bool {
         let initial_len = self.pinned_ids.len();
         self.pinned_ids.retain(|id| id != desktop_id);
-        if self.pinned_ids.len() != initial_len {
+        let changed = self.pinned_ids.len() != initial_len;
+        if changed {
             save_pinned_ids(&self.pinned_ids);
-            true
-        } else {
-            false
         }
+        changed
     }
 
     pub fn reorder_pin(&mut self, desktop_id: &str, target_idx: usize) -> bool {
@@ -180,15 +185,12 @@ impl DockState {
     pub fn mark_urgent(&mut self, addr: &str) {
         self.urgent_addresses.insert(normalize_addr(addr));
     }
-
     pub fn clear_urgent(&mut self, addr: &str) {
         self.urgent_addresses.remove(&normalize_addr(addr));
     }
-
     pub fn clear_all_urgent(&mut self) {
         self.urgent_addresses.clear();
     }
-
     pub fn is_address_urgent(&self, addr: &str) -> bool {
         self.urgent_addresses.contains(&normalize_addr(addr))
     }
@@ -196,11 +198,12 @@ impl DockState {
     pub fn set_filter_monitor(&mut self, monitor_id: Option<i64>) {
         self.filter_monitor = monitor_id;
     }
-
     pub fn set_profile(&mut self, profile: &str) {
         self.profile = profile.to_string();
     }
-
+    pub fn set_autohide(&mut self, enabled: bool) {
+        self.autohide = enabled;
+    }
     pub fn sync_theme(&mut self) {
         self.theme = load_omarchy_theme();
     }
@@ -213,11 +216,13 @@ impl DockState {
             .as_ref()
             .map_or(JsonValue::Null, |a| JsonValue::String(a.clone()));
         map.insert("active_address".into(), active);
-        let filter_mon = self
+        let mon = self
             .filter_monitor
             .map_or(JsonValue::Null, |m| JsonValue::Number(m as f64));
-        map.insert("filter_monitor".into(), filter_mon);
+        map.insert("filter_monitor".into(), mon);
         map.insert("overlap".into(), JsonValue::Bool(self.overlap));
+        map.insert("has_windows".into(), JsonValue::Bool(self.has_windows));
+        map.insert("autohide".into(), JsonValue::Bool(self.autohide));
         map.insert("theme".into(), self.theme.to_json());
         let items: Vec<JsonValue> = self.items.iter().map(DockItem::to_json).collect();
         map.insert("items".into(), JsonValue::Array(items));

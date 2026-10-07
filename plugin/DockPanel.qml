@@ -13,8 +13,18 @@ PanelWindow {
     property var shell: null
     property var manifest: null
 
-    // Default pinned items so dock is never empty
+    // Default pinned items: ONLY File Explorer, Default Web Browser, Default Terminal
     readonly property var defaultDockItems: [
+        {
+            desktop_id: "nautilus.desktop",
+            name: "Files",
+            icon_path: "/usr/share/icons/hicolor/scalable/apps/system-file-manager.svg",
+            running: false,
+            focused: false,
+            urgent: false,
+            windows: [],
+            active_count: 0
+        },
         {
             desktop_id: "firefox.desktop",
             name: "Web Browser",
@@ -34,47 +44,18 @@ PanelWindow {
             urgent: false,
             windows: [],
             active_count: 0
-        },
-        {
-            desktop_id: "nautilus.desktop",
-            name: "Files",
-            icon_path: "/usr/share/icons/hicolor/scalable/apps/system-file-manager.svg",
-            running: false,
-            focused: false,
-            urgent: false,
-            windows: [],
-            active_count: 0
-        },
-        {
-            desktop_id: "code.desktop",
-            name: "Code",
-            icon_path: "/usr/share/icons/hicolor/scalable/apps/code.svg",
-            running: false,
-            focused: false,
-            urgent: false,
-            windows: [],
-            active_count: 0
-        },
-        {
-            desktop_id: "omarchy-settings.desktop",
-            name: "Settings",
-            icon_path: "/usr/share/icons/hicolor/scalable/apps/preferences-system.svg",
-            running: false,
-            focused: false,
-            urgent: false,
-            windows: [],
-            active_count: 0
         }
     ]
 
     // Dock configuration state
     property string profile: "general"
-    property bool fileShortcuts: true
-    property bool autoHide: false
+    property bool fileShortcuts: false
+    property bool autoHide: true
     property bool dockVisible: true
     property var dockItems: defaultDockItems
     property string activeAddress: ""
     property bool overlap: false
+    property bool hasWindows: false
     property bool filterMonitor: false
     property var theme: null
 
@@ -95,7 +76,21 @@ PanelWindow {
 
     color: "transparent"
 
-    readonly property bool isDockHidden: root.autoHide && root.overlap && !dockHoverArea.containsMouse
+    // Intellihide: hides when windows exist on screen, pops up on mouse proximity or empty desktop
+    readonly property bool isDockHidden: {
+        if (!root.autoHide) return false
+        if (proximityTrigger.containsMouse || dockHoverArea.containsMouse) return false
+        return (root.overlap || root.hasWindows)
+    }
+
+    // Screen edge proximity trigger spanning the bottom area
+    MouseArea {
+        id: proximityTrigger
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        z: 1
+    }
 
     // Background pill/taskbar styling
     Rectangle {
@@ -104,6 +99,7 @@ PanelWindow {
         height: root.profile === "windows" ? 48 : 54
         implicitWidth: contentRow.implicitWidth + 20
         width: implicitWidth
+        z: 2
 
         radius: root.profile === "windows" ? 0 : 16
         color: root.profile === "windows"
@@ -112,22 +108,27 @@ PanelWindow {
         border.color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.12)
         border.width: root.profile === "windows" ? 0 : 1
 
-        opacity: root.isDockHidden ? 0.2 : 1.0
+        opacity: root.isDockHidden ? 0.0 : 1.0
         transform: Translate {
-            y: root.isDockHidden ? 44 : 0
+            y: root.isDockHidden ? (root.height - 2) : 0
             Behavior on y {
                 NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
             }
         }
         Behavior on opacity {
-            NumberAnimation { duration: 180 }
+            NumberAnimation { duration: 160 }
         }
 
         MouseArea {
             id: dockHoverArea
             anchors.fill: parent
             hoverEnabled: true
-            acceptedButtons: Qt.NoButton
+            acceptedButtons: Qt.RightButton
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.RightButton) {
+                    settingsPopup.popup(dockBar, mouse.x, mouse.y)
+                }
+            }
         }
 
         RowLayout {
@@ -244,7 +245,7 @@ PanelWindow {
                 }
             }
 
-            // Separator before file shortcuts
+            // Separator before file shortcuts (hidden when shortcuts disabled)
             Rectangle {
                 visible: root.fileShortcuts && root.dockItems.length > 0
                 width: 1
@@ -287,7 +288,7 @@ PanelWindow {
         }
     }
 
-    // Context Menu for Window Management Actions
+    // Context Menu for Window Management Actions & Pinning
     AppMenu {
         id: appMenu
         onActionTriggered: function(action, params) {
@@ -311,6 +312,7 @@ PanelWindow {
         }
         onAutoHideToggled: function(enabled) {
             root.autoHide = enabled
+            dockRpc.sendAction("autohide", { enabled: enabled })
         }
         onFilterCurrentMonitorToggled: function(enabled) {
             root.filterMonitor = enabled
@@ -354,6 +356,7 @@ PanelWindow {
                 else if (params.address) args.push(params.address)
                 else if (params.target) args.push(params.target)
                 else if (params.profile) args.push(params.profile)
+                else if (params.enabled !== undefined) args.push(params.enabled ? "on" : "off")
                 else if (params.monitor_id !== undefined) args.push(params.monitor_id.toString())
             }
             clientProcess.command = [dockRpc.helperPath].concat(args)
@@ -407,6 +410,12 @@ PanelWindow {
                         }
                         if (parsed.overlap !== undefined) {
                             root.overlap = parsed.overlap
+                        }
+                        if (parsed.has_windows !== undefined) {
+                            root.hasWindows = parsed.has_windows
+                        }
+                        if (parsed.autohide !== undefined) {
+                            root.autoHide = parsed.autohide
                         }
                         if (parsed.theme) {
                             root.theme = parsed.theme
