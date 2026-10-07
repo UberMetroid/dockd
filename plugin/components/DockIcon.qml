@@ -84,7 +84,12 @@ Item {
         anchors.centerIn: parent
         width: 36
         height: 36
-        source: root.iconPath.length > 0 ? "file://" + root.iconPath : ""
+        source: {
+            if (!root.iconPath || root.iconPath.length === 0) return ""
+            if (root.iconPath.indexOf("://") !== -1) return root.iconPath
+            if (root.iconPath.charAt(0) === "/") return "file://" + root.iconPath
+            return "image://icon/" + root.iconPath
+        }
         sourceSize.width: 48
         sourceSize.height: 48
         fillMode: Image.PreserveAspectFit

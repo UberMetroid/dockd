@@ -13,25 +13,85 @@ PanelWindow {
     property var shell: null
     property var manifest: null
 
+    // Default pinned items so dock is never empty
+    readonly property var defaultDockItems: [
+        {
+            desktop_id: "firefox.desktop",
+            name: "Web Browser",
+            icon_path: "/usr/share/icons/hicolor/scalable/apps/firefox.svg",
+            running: false,
+            focused: false,
+            urgent: false,
+            windows: [],
+            active_count: 0
+        },
+        {
+            desktop_id: "org.wezfurlong.wezterm.desktop",
+            name: "Terminal",
+            icon_path: "/usr/share/icons/hicolor/scalable/apps/org.wezfurlong.wezterm.svg",
+            running: false,
+            focused: false,
+            urgent: false,
+            windows: [],
+            active_count: 0
+        },
+        {
+            desktop_id: "nautilus.desktop",
+            name: "Files",
+            icon_path: "/usr/share/icons/hicolor/scalable/apps/system-file-manager.svg",
+            running: false,
+            focused: false,
+            urgent: false,
+            windows: [],
+            active_count: 0
+        },
+        {
+            desktop_id: "code.desktop",
+            name: "Code",
+            icon_path: "/usr/share/icons/hicolor/scalable/apps/code.svg",
+            running: false,
+            focused: false,
+            urgent: false,
+            windows: [],
+            active_count: 0
+        },
+        {
+            desktop_id: "omarchy-settings.desktop",
+            name: "Settings",
+            icon_path: "/usr/share/icons/hicolor/scalable/apps/preferences-system.svg",
+            running: false,
+            focused: false,
+            urgent: false,
+            windows: [],
+            active_count: 0
+        }
+    ]
+
     // Dock configuration state
     property string profile: "general"
     property bool fileShortcuts: true
     property bool autoHide: false
     property bool dockVisible: true
-    property var dockItems: []
+    property var dockItems: defaultDockItems
     property string activeAddress: ""
     property bool overlap: false
     property bool filterMonitor: false
     property var theme: null
 
     // Layer-shell geometry
-    anchors.bottom: true
-    anchors.horizontalCenter: true
-    margins.bottom: profile === "windows" ? 0 : 8
-    exclusiveZone: profile === "windows" ? implicitHeight : -1
+    anchors {
+        bottom: true
+    }
+    margins {
+        bottom: root.profile === "windows" ? 0 : 8
+    }
+    exclusiveZone: root.profile === "windows" ? implicitHeight : -1
 
-    implicitWidth: dockBar.implicitWidth + 24
-    implicitHeight: 56
+    WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.namespace: "dockd"
+
+    implicitWidth: dockBar.implicitWidth + 32
+    implicitHeight: root.profile === "windows" ? 52 : 64
 
     color: "transparent"
 
@@ -41,8 +101,9 @@ PanelWindow {
     Rectangle {
         id: dockBar
         anchors.centerIn: parent
-        height: 52
-        width: contentRow.implicitWidth + 16
+        height: root.profile === "windows" ? 48 : 54
+        implicitWidth: contentRow.implicitWidth + 20
+        width: implicitWidth
 
         radius: root.profile === "windows" ? 0 : 16
         color: root.profile === "windows"
@@ -74,7 +135,80 @@ PanelWindow {
             anchors.centerIn: parent
             spacing: root.profile === "mac" ? 8 : 4
 
-            // Application launcher icons
+            // 1. App Launcher Button (Applications drawer)
+            Item {
+                id: launcherBtn
+                width: 44
+                height: 44
+                Layout.alignment: Qt.AlignVCenter
+
+                Rectangle {
+                    id: launcherPlate
+                    anchors.centerIn: parent
+                    width: 38
+                    height: 38
+                    radius: root.profile === "windows" ? 4 : 12
+                    color: launcherMouse.containsMouse
+                        ? ((root.theme && root.theme.accent) ? Qt.rgba(0.22, 0.74, 0.97, 0.25) : Qt.rgba(1, 1, 1, 0.15))
+                        : Qt.rgba(1, 1, 1, 0.07)
+                    border.color: launcherMouse.containsMouse
+                        ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
+                        : Qt.rgba(1, 1, 1, 0.12)
+                    border.width: 1
+
+                    scale: launcherMouse.containsMouse ? 1.08 : 1.0
+                    Behavior on scale { NumberAnimation { duration: 100 } }
+
+                    // 9-dot launcher grid icon
+                    Grid {
+                        anchors.centerIn: parent
+                        columns: 3
+                        spacing: 4
+
+                        Repeater {
+                            model: 9
+                            Rectangle {
+                                width: 4
+                                height: 4
+                                radius: 2
+                                color: launcherMouse.containsMouse
+                                    ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
+                                    : ((root.theme && root.theme.foreground) ? root.theme.foreground : "#f8fafc")
+                            }
+                        }
+                    }
+                }
+
+                MouseArea {
+                    id: launcherMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    onClicked: function(mouse) {
+                        if (mouse.button === Qt.LeftButton) {
+                            dockRpc.launchAppDrawer()
+                        } else {
+                            settingsPopup.popup(launcherBtn, mouse.x, mouse.y)
+                        }
+                    }
+                }
+
+                ToolTip.visible: launcherMouse.containsMouse
+                ToolTip.text: "Applications (Super + Space)"
+                ToolTip.delay: 300
+            }
+
+            // Separator after App Launcher
+            Rectangle {
+                width: 1
+                height: 24
+                color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.15)
+                Layout.alignment: Qt.AlignVCenter
+                Layout.leftMargin: 2
+                Layout.rightMargin: 4
+            }
+
+            // 2. Application launcher & running window icons
             Repeater {
                 model: root.dockItems
 
@@ -114,7 +248,7 @@ PanelWindow {
             Rectangle {
                 visible: root.fileShortcuts && root.dockItems.length > 0
                 width: 1
-                height: 28
+                height: 24
                 color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.15)
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: 4
@@ -193,10 +327,27 @@ PanelWindow {
     Item {
         id: dockRpc
 
-        property string helperPath: (typeof Quickshell !== "undefined" && Quickshell.env("DOCKD_BIN")) ? Quickshell.env("DOCKD_BIN") : "dockd"
-        property var pendingActions: []
+        property string helperPath: {
+            if (typeof Quickshell !== "undefined" && Quickshell.env("DOCKD_BIN")) {
+                return Quickshell.env("DOCKD_BIN")
+            }
+            return "dockd"
+        }
+
+        function ensureDaemon() {
+            if (!daemonCheckProcess.running) {
+                daemonCheckProcess.command = ["sh", "-c", "pgrep -x dockd >/dev/null || (systemctl --user start dockd.socket 2>/dev/null || systemctl --user start dockd.service 2>/dev/null || ~/.local/bin/dockd --daemon 2>/dev/null || dockd --daemon 2>/dev/null) &"]
+                daemonCheckProcess.running = true
+            }
+        }
+
+        function launchAppDrawer() {
+            drawerProcess.command = ["sh", "-c", "omarchy menu || walker || rofi -show drun || fuzzel || wofi --show drun || hyprctl dispatch exec walker"]
+            drawerProcess.running = true
+        }
 
         function sendAction(actionName, params) {
+            ensureDaemon()
             var args = [actionName]
             if (params) {
                 if (params.desktop_id) args.push(params.desktop_id)
@@ -225,6 +376,14 @@ PanelWindow {
         }
 
         Process {
+            id: daemonCheckProcess
+        }
+
+        Process {
+            id: drawerProcess
+        }
+
+        Process {
             id: clientProcess
             stdout: StdioCollector {
                 onTextChanged: dockRpc.refreshState()
@@ -237,7 +396,7 @@ PanelWindow {
                 onTextChanged: {
                     try {
                         var parsed = JSON.parse(text)
-                        if (parsed.items) {
+                        if (parsed.items && parsed.items.length > 0) {
                             root.dockItems = parsed.items
                         }
                         if (parsed.profile) {
@@ -261,6 +420,7 @@ PanelWindow {
     }
 
     Component.onCompleted: {
+        dockRpc.ensureDaemon()
         dockRpc.refreshState()
     }
 }

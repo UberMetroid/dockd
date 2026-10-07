@@ -5,21 +5,12 @@
   "version": "0.1.0",
   "author": "UberMetroid",
   "license": "GPL-2.0-or-later",
-  "description": "High-performance native app dock and window manager daemon for Omarchy",
+  "description": "Desktop application dock and launcher for Omarchy",
   "kinds": [
-    "service",
-    "bar-widget"
+    "panel"
   ],
   "keepLoaded": true,
   "entryPoints": {
-    "service": "DockPanel.qml",
-    "barWidget": "BarWidget.qml"
-  },
-  "barWidget": {
-    "displayName": "dockd",
-    "description": "App dock and window manager controls",
-    "category": "System",
-    "allowMultiple": false,
-    "defaultSection": "right"
+    "panel": "DockPanel.qml"
   }
 }
