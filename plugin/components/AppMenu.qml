@@ -6,6 +6,7 @@ Menu {
     id: root
 
     property var itemData: null
+    property int systemRounding: 12
     signal actionTriggered(string action, var params)
 
     title: itemData ? itemData.name : "Application"

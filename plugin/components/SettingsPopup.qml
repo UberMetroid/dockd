@@ -10,6 +10,7 @@ Popup {
     property bool autoHide: true
     property bool showIndicators: true
     property bool filterCurrentMonitor: false
+    property int systemRounding: 12
     property var theme: null
 
     signal dockSizeChanged(string size)
@@ -28,7 +29,7 @@ Popup {
 
     background: Rectangle {
         color: (root.theme && root.theme.background) ? Qt.rgba(0.09, 0.12, 0.18, 0.94) : "#141b27"
-        radius: 16
+        radius: Math.max(10, root.systemRounding)
         border.color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.15)
         border.width: 1
     }

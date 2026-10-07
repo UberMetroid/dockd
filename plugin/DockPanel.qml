@@ -61,6 +61,26 @@ Item {
     property bool filterMonitor: false
     property var theme: null
 
+    // Dynamic system window corner radius (matches decoration:rounding from Hyprland)
+    property int systemRounding: 12
+
+    Process {
+        id: roundingProc
+        command: ["hyprctl", "-j", "getoption", "decoration:rounding"]
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+                try {
+                    var parsed = JSON.parse(text || "{}")
+                    var n = Number(parsed.int)
+                    if (isFinite(n) && n >= 0) {
+                        root.systemRounding = n
+                    }
+                } catch(e) {}
+            }
+        }
+    }
+
     // Geometry calculations based on dockSize
     readonly property real dockHeight: dockSize === "small" ? 48 : (dockSize === "large" ? 68 : 56)
     readonly property real slotDimension: dockSize === "small" ? 40 : (dockSize === "large" ? 58 : 48)
@@ -69,23 +89,65 @@ Item {
     // Intellihide: hides when windows exist on screen, reveals on mouse proximity or empty desktop
     readonly property bool isDockHidden: {
         if (!root.autoHide) return false
-        if (root.proximityActive || (dockPanelWindow && dockPanelWindow.isHovered) || (dockPanelWindow && dockPanelWindow.isPopupOpen)) return false
+        if (root.proximityActive || (dockPanelWindow && (dockPanelWindow.isHovered || dockPanelWindow.isProximityTriggered || dockPanelWindow.isPopupOpen))) return false
         return (root.overlap || root.hasWindows)
     }
 
     // Auto-hide hysteresis timer to prevent abrupt snapping
     Timer {
         id: autohideTimer
-        interval: 350
+        interval: 400
         repeat: false
         onTriggered: {
-            if (!dockPanelWindow.isHovered && !dockPanelWindow.isProximityTriggered) {
+            if (!dockPanelWindow.isHovered && !dockPanelWindow.isProximityTriggered && !dockPanelWindow.isPopupOpen) {
                 root.proximityActive = false
             }
         }
     }
 
-    // The Persistent Layer-Shell Dock Window
+    // 1. Edge Trigger Layer Window: full-width strip at bottom edge to summon dock on hover
+    PanelWindow {
+        id: edgeTriggerWindow
+        visible: root.isDockHidden
+
+        WlrLayershell.namespace: "dockd-edge"
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        exclusionMode: ExclusionMode.Ignore
+        color: "transparent"
+
+        anchors {
+            bottom: true
+            left: true
+            right: true
+        }
+        margins {
+            bottom: 0
+            left: 0
+            right: 0
+        }
+        implicitHeight: 4
+
+        Loader {
+            id: edgeTriggerLoader
+            anchors.fill: parent
+            active: edgeTriggerWindow.visible
+
+            sourceComponent: Component {
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                    onEntered: {
+                        autohideTimer.stop()
+                        root.proximityActive = true
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. The Persistent Layer-Shell Dock Window
     PanelWindow {
         id: dockPanelWindow
 
@@ -97,19 +159,19 @@ Item {
             bottom: true
         }
         margins {
-            bottom: 8
+            bottom: 0
         }
         exclusiveZone: -1
 
         WlrLayershell.layer: root.autoHide ? WlrLayer.Overlay : WlrLayer.Top
         WlrLayershell.namespace: "dockd"
 
-        implicitWidth: dockBar.implicitWidth + 32
-        implicitHeight: root.dockHeight + 20
+        implicitWidth: dockBar.implicitWidth + 48
+        implicitHeight: root.dockHeight + 16
 
         color: "transparent"
 
-        // Screen edge proximity trigger spanning the bottom area
+        // Screen edge proximity trigger spanning the bottom area of the dock window
         MouseArea {
             id: proximityTrigger
             anchors.fill: parent
@@ -128,13 +190,19 @@ Item {
         // Background macOS frosted glass pill
         Rectangle {
             id: dockBar
-            anchors.centerIn: parent
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 8
             height: root.dockHeight
             implicitWidth: contentRow.implicitWidth + 18
             width: implicitWidth
             z: 2
 
-            radius: 18
+            radius: root.systemRounding
+            Behavior on radius {
+                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+            }
+
             color: (root.theme && root.theme.background)
                 ? Qt.rgba(0.08, 0.11, 0.16, 0.78)
                 : Qt.rgba(0.08, 0.11, 0.16, 0.78)
@@ -145,7 +213,7 @@ Item {
 
             opacity: root.isDockHidden ? 0.0 : 1.0
             transform: Translate {
-                y: root.isDockHidden ? (dockPanelWindow.height + 12) : 0
+                y: root.isDockHidden ? (dockPanelWindow.height + 16) : 0
                 Behavior on y {
                     NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
                 }
@@ -190,7 +258,7 @@ Item {
                         anchors.centerIn: parent
                         width: root.slotDimension - 8
                         height: root.slotDimension - 8
-                        radius: 12
+                        radius: Math.max(4, root.systemRounding - 4)
                         color: launcherMouse.containsMouse
                             ? ((root.theme && root.theme.accent) ? Qt.rgba(0.22, 0.74, 0.97, 0.25) : Qt.rgba(1, 1, 1, 0.18))
                             : Qt.rgba(1, 1, 1, 0.08)
@@ -318,7 +386,7 @@ Item {
                         anchors.centerIn: parent
                         width: root.slotDimension - 8
                         height: root.slotDimension - 8
-                        radius: 12
+                        radius: Math.max(4, root.systemRounding - 4)
                         color: settingsMouse.containsMouse
                             ? ((root.theme && root.theme.accent) ? Qt.rgba(0.22, 0.74, 0.97, 0.25) : Qt.rgba(1, 1, 1, 0.18))
                             : Qt.rgba(1, 1, 1, 0.08)
@@ -379,6 +447,7 @@ Item {
             autoHide: root.autoHide
             showIndicators: root.showIndicators
             filterCurrentMonitor: root.filterMonitor
+            systemRounding: root.systemRounding
             theme: root.theme
 
             onDockSizeChanged: function(size) {
@@ -456,6 +525,9 @@ Item {
                 stateProcess.command = [dockRpc.helperPath, "state"]
                 stateProcess.running = true
             }
+            if (!roundingProc.running) {
+                roundingProc.running = true
+            }
         }
 
         // Periodic state sync timer (every 1 second or on events)
@@ -528,5 +600,6 @@ Item {
     Component.onCompleted: {
         dockRpc.ensureDaemon()
         dockRpc.refreshState()
+        roundingProc.running = true
     }
 }

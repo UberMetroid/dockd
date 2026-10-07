@@ -23,8 +23,8 @@ BRANCH="main"
 CANONICAL_URL="https://ubermetroid.github.io/dockd"
 GITHUB_URL="https://github.com/${REPO}"
 RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
-VERSION_PIN="v0.1.4"
-RAW_VERSION="0.1.4"
+VERSION_PIN="v0.1.5"
+RAW_VERSION="0.1.5"
 RELEASE_BASE="${GITHUB_URL}/releases/download/${VERSION_PIN}"
 
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ] && [ "${TERM:-dumb}" != "dumb" ]; then
