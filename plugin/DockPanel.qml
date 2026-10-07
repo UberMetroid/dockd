@@ -211,11 +211,11 @@ Item {
                 : Qt.rgba(1, 1, 1, 0.15)
             border.width: 1
 
-            opacity: root.isDockHidden ? 0.0 : 1.0
+            opacity: root.isDockHidden ? 0.75 : 1.0
             transform: Translate {
-                y: root.isDockHidden ? (dockPanelWindow.height + 16) : 0
+                y: root.isDockHidden ? (root.dockHeight - 4) : 0
                 Behavior on y {
-                    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
                 }
             }
             Behavior on opacity {
@@ -245,6 +245,10 @@ Item {
                 id: contentRow
                 anchors.centerIn: parent
                 spacing: 6
+                opacity: root.isDockHidden ? 0.0 : 1.0
+                Behavior on opacity {
+                    NumberAnimation { duration: 160 }
+                }
 
                 // 1. App Launcher / Launchpad Button
                 Item {

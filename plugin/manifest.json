@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "org.ubermetroid.dockd",
   "name": "dockd",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "author": "UberMetroid",
   "license": "GPL-2.0-or-later",
   "description": "macOS-style desktop application dock and launcher for Omarchy",
