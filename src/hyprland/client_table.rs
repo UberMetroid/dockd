@@ -102,3 +102,8 @@ impl HyprClient {
         self.hidden || self.workspace_name.starts_with("special:minimized")
     }
 }
+
+pub fn normalize_addr(addr: &str) -> String {
+    let lower = addr.to_ascii_lowercase();
+    lower.strip_prefix("0x").unwrap_or(&lower).to_string()
+}

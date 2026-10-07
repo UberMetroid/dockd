@@ -1,6 +1,6 @@
 //! Data model for dock launcher items and window descriptors.
 //!
-//! Encapsulates launcher identity, running window instances, badges, and layout metadata.
+//! Encapsulates launcher identity, running window instances, badges, urgency, and layout metadata.
 
 use crate::syntax::json_value::JsonValue;
 use std::collections::BTreeMap;
@@ -14,6 +14,7 @@ pub struct WindowSummary {
     pub minimized: bool,
     pub floating: bool,
     pub focused: bool,
+    pub urgent: bool,
     pub pid: u64,
 }
 
@@ -36,6 +37,7 @@ impl WindowSummary {
         map.insert("minimized".to_string(), JsonValue::Bool(self.minimized));
         map.insert("floating".to_string(), JsonValue::Bool(self.floating));
         map.insert("focused".to_string(), JsonValue::Bool(self.focused));
+        map.insert("urgent".to_string(), JsonValue::Bool(self.urgent));
         map.insert("pid".to_string(), JsonValue::Number(self.pid as f64));
         JsonValue::Object(map)
     }
@@ -49,6 +51,7 @@ pub struct DockItem {
     pub exec_cmd: String,
     pub wm_class: String,
     pub pinned: bool,
+    pub urgent: bool,
     pub windows: Vec<WindowSummary>,
     pub badge_count: u32,
 }
@@ -60,6 +63,10 @@ impl DockItem {
 
     pub fn has_focused_window(&self) -> bool {
         self.windows.iter().any(|w| w.focused)
+    }
+
+    pub fn is_urgent(&self) -> bool {
+        self.urgent || self.windows.iter().any(|w| w.urgent)
     }
 
     pub fn to_json(&self) -> JsonValue {
@@ -87,6 +94,7 @@ impl DockItem {
             "focused".to_string(),
             JsonValue::Bool(self.has_focused_window()),
         );
+        map.insert("urgent".to_string(), JsonValue::Bool(self.is_urgent()));
         map.insert(
             "active_count".to_string(),
             JsonValue::Number(self.windows.len() as f64),
@@ -117,6 +125,7 @@ mod tests {
             minimized: false,
             floating: false,
             focused: true,
+            urgent: false,
             pid: 1234,
         };
         let item = DockItem {
@@ -126,14 +135,17 @@ mod tests {
             exec_cmd: "wezterm".to_string(),
             wm_class: "org.wezfurlong.wezterm".to_string(),
             pinned: true,
+            urgent: false,
             windows: vec![win],
             badge_count: 0,
         };
         assert!(item.is_running());
         assert!(item.has_focused_window());
+        assert!(!item.is_urgent());
         let json = item.to_json();
         assert_eq!(json.get_str("name"), Some("WezTerm"));
         assert_eq!(json.get_bool("running"), Some(true));
         assert_eq!(json.get_bool("focused"), Some(true));
+        assert_eq!(json.get_bool("urgent"), Some(false));
     }
 }

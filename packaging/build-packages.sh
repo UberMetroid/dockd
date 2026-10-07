@@ -34,8 +34,11 @@ if command -v dpkg-deb >/dev/null 2>&1; then
     install -m 0644 "${ROOT_DIR}/systemd/user/dockd.service" "${DEB_ROOT}/usr/lib/systemd/user/dockd.service"
     install -m 0644 "${ROOT_DIR}/systemd/user/dockd.socket" "${DEB_ROOT}/usr/lib/systemd/user/dockd.socket"
     cp -rf "${ROOT_DIR}/plugin/"* "${DEB_ROOT}/usr/share/omarchy/plugins/org.ubermetroid.dockd/"
+    install -m 0755 "${ROOT_DIR}/uninstall.sh" "${DEB_ROOT}/usr/share/omarchy/plugins/org.ubermetroid.dockd/uninstall.sh"
+    ln -sf "/usr/share/omarchy/plugins/org.ubermetroid.dockd/uninstall.sh" "${DEB_ROOT}/usr/bin/dockd-uninstall"
     install -m 0644 "${ROOT_DIR}/README.md" "${DEB_ROOT}/usr/share/doc/dockd/README.md"
     install -m 0644 "${ROOT_DIR}/LICENSE" "${DEB_ROOT}/usr/share/doc/dockd/copyright"
+
 
     cat <<EOF > "${DEB_ROOT}/DEBIAN/control"
 Package: dockd

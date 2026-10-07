@@ -38,6 +38,9 @@ install -D -p -m 0644 systemd/user/dockd.socket %{buildroot}%{_userunitdir}/dock
 
 install -d -m 0755 %{buildroot}%{_datadir}/omarchy/plugins/org.ubermetroid.dockd
 cp -rf plugin/* %{buildroot}%{_datadir}/omarchy/plugins/org.ubermetroid.dockd/
+install -m 0755 uninstall.sh %{buildroot}%{_datadir}/omarchy/plugins/org.ubermetroid.dockd/uninstall.sh
+ln -sf ../share/omarchy/plugins/org.ubermetroid.dockd/uninstall.sh %{buildroot}%{_bindir}/dockd-uninstall
+
 
 %post
 %{?systemd_user_post: %systemd_user_post dockd.socket}
@@ -52,9 +55,11 @@ cp -rf plugin/* %{buildroot}%{_datadir}/omarchy/plugins/org.ubermetroid.dockd/
 %license LICENSE
 %doc README.md
 %{_bindir}/dockd
+%{_bindir}/dockd-uninstall
 %{_userunitdir}/dockd.service
 %{_userunitdir}/dockd.socket
 %{_datadir}/omarchy/plugins/org.ubermetroid.dockd
+
 
 %changelog
 * Tue Oct 06 2026 UberMetroid <ubermetroid@users.noreply.github.com> - 0.1.0-1

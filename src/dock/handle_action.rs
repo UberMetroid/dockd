@@ -1,11 +1,11 @@
 //! Dispatches incoming client JSON action requests against Hyprland and state.
 //!
-//! Handles launch, toggle, window arrangement, pinning, and layout profile mutations.
+//! Handles launch, toggle, window arrangement, pinning, reordering, and layout profile mutations.
 
 use super::dock_state::DockState;
 use crate::hyprland::{
-    close_window, focus_window, force_quit_pid, minimize_window, query_clients, query_monitors,
-    restore_window, snap_window, toggle_floating,
+    close_window, focus_window, force_quit_pid, minimize_window, query_active_window,
+    query_clients, query_monitors, restore_window, snap_window, toggle_floating,
 };
 use crate::syntax::json_value::JsonValue;
 use crate::system::error_status::DockError;
@@ -34,6 +34,7 @@ pub fn execute_action(
                 .get_str("desktop_id")
                 .ok_or("Missing desktop_id to pin")?;
             state.pin(id);
+            sync_hypr_state(state, hypr_cmd_sock);
             Ok(json_ok("Pinned"))
         }
         "unpin" => {
@@ -41,7 +42,38 @@ pub fn execute_action(
                 .get_str("desktop_id")
                 .ok_or("Missing desktop_id to unpin")?;
             state.unpin(id);
+            sync_hypr_state(state, hypr_cmd_sock);
             Ok(json_ok("Unpinned"))
+        }
+        "reorder" => {
+            let id = req
+                .get_str("desktop_id")
+                .ok_or("Missing desktop_id to reorder")?;
+            let idx = req.get_i64("index").unwrap_or(0).max(0) as usize;
+            if state.reorder_pin(id, idx) {
+                sync_hypr_state(state, hypr_cmd_sock);
+                Ok(json_ok("Reordered"))
+            } else {
+                Err(DockError::NotFound(format!(
+                    "Desktop ID '{id}' is not pinned"
+                )))
+            }
+        }
+        "set_monitor_filter" => {
+            let mon_id = if req.get("monitor_id").is_some_and(|v| v.is_null()) {
+                None
+            } else {
+                req.get_i64("monitor_id").filter(|&m| m >= 0)
+            };
+            state.set_filter_monitor(mon_id);
+            sync_hypr_state(state, hypr_cmd_sock);
+            Ok(json_ok("Monitor filter updated"))
+        }
+        "set_overlap" => {
+            if let Some(overlap) = req.get_bool("overlap") {
+                state.overlap = overlap;
+            }
+            Ok(json_ok("Overlap updated"))
         }
         "open_location" => {
             let target = req.get_str("target").unwrap_or("home");
@@ -119,6 +151,17 @@ pub fn execute_action(
     }
 }
 
+fn sync_hypr_state(state: &mut DockState, sock: Option<&Path>) {
+    if let Some(s) = sock {
+        let clients = query_clients(s).unwrap_or_default();
+        let active = query_active_window(s).unwrap_or(None);
+        let active_addr = active.as_ref().map(|c| c.address.as_str());
+        state.rebuild_items(&clients, active_addr);
+    } else {
+        state.rebuild_items(&[], None);
+    }
+}
+
 fn handle_toggle(
     req: &JsonValue,
     state: &mut DockState,
@@ -131,11 +174,9 @@ fn handle_toggle(
     {
         let sock_path = sock.ok_or(DockError::Hyprland("Hyprland socket unavailable".into()))?;
         if let Some(focused_win) = it.windows.iter().find(|w| w.focused) {
-            // Already focused: minimize it
             minimize_window(sock_path, &focused_win.address)?;
             return Ok(json_ok("Minimized active window"));
         } else {
-            // Focus the first available window
             let target = &it.windows[0];
             if target.minimized {
                 restore_window(sock_path, &target.address, target.workspace_id)?;
@@ -145,7 +186,6 @@ fn handle_toggle(
             return Ok(json_ok("Focused window"));
         }
     }
-    // Launch new instance if none running
     if let Some(entry) = state.desktop_entries.iter().find(|e| e.id == id) {
         launch_exec(&entry.exec)?;
         return Ok(json_ok("Launched"));

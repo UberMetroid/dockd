@@ -8,12 +8,14 @@ Popup {
     property string currentProfile: "general"
     property bool showFileShortcuts: true
     property bool autoHide: false
+    property bool filterCurrentMonitor: false
 
     signal profileChanged(string profile)
     signal fileShortcutsToggled(bool enabled)
     signal autoHideToggled(bool enabled)
+    signal filterCurrentMonitorToggled(bool enabled)
 
-    width: 240
+    width: 250
     height: contentColumn.implicitHeight + 32
     padding: 16
     modal: true
@@ -86,6 +88,12 @@ Popup {
             text: "Auto-hide on window overlap"
             checked: root.autoHide
             onToggled: root.autoHideToggled(checked)
+        }
+
+        CheckBox {
+            text: "Filter by current monitor"
+            checked: root.filterCurrentMonitor
+            onToggled: root.filterCurrentMonitorToggled(checked)
         }
     }
 }

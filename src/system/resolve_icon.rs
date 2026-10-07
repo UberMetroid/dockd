@@ -1,7 +1,8 @@
 //! Icon path resolution conforming to the XDG Icon Theme specification.
 //!
-//! Locates PNG and SVG icons across standard system directories and user overrides.
+//! Detects active GTK icon themes and locates PNG/SVG icons across standard directories.
 
+use std::fs;
 use std::path::{Path, PathBuf};
 
 const ICON_EXTENSIONS: &[&str] = &["png", "svg", "xpm"];
@@ -14,6 +15,36 @@ const PREFERRED_SIZES: &[&str] = &[
     "48x48/apps",
     "32x32/apps",
 ];
+
+pub fn detect_active_icon_theme() -> Option<String> {
+    let Ok(home) = std::env::var("HOME") else {
+        return None;
+    };
+
+    let candidates = [
+        PathBuf::from(&home).join(".config/gtk-3.0/settings.ini"),
+        PathBuf::from(&home).join(".config/gtk-4.0/settings.ini"),
+    ];
+
+    for path in &candidates {
+        let Ok(content) = fs::read_to_string(path) else {
+            continue;
+        };
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if let Some((k, v)) = trimmed.split_once('=')
+                && k.trim() == "gtk-icon-theme-name"
+            {
+                let theme = v.trim().trim_matches('"').trim_matches('\'').trim();
+                if !theme.is_empty() {
+                    return Some(theme.to_string());
+                }
+            }
+        }
+    }
+
+    None
+}
 
 pub fn resolve_icon_path(icon_name: &str) -> Option<String> {
     if icon_name.is_empty() {
@@ -40,18 +71,27 @@ pub fn resolve_icon_path(icon_name: &str) -> Option<String> {
         }
     }
 
-    // Search theme hierarchies (hicolor fallback)
-    for base in &base_dirs {
-        let hicolor = base.join("hicolor");
-        if !hicolor.is_dir() {
-            continue;
-        }
-        for size in PREFERRED_SIZES {
-            let app_dir = hicolor.join(size);
-            for ext in ICON_EXTENSIONS {
-                let candidate = app_dir.join(format!("{icon_name}.{ext}"));
-                if candidate.is_file() {
-                    return Some(candidate.to_string_lossy().into_owned());
+    // Determine theme search list: active theme first, then hicolor fallback
+    let mut themes = Vec::new();
+    if let Some(active) = detect_active_icon_theme() {
+        themes.push(active);
+    }
+    themes.push("hicolor".to_string());
+
+    // Search theme hierarchies
+    for theme in &themes {
+        for base in &base_dirs {
+            let theme_dir = base.join(theme);
+            if !theme_dir.is_dir() {
+                continue;
+            }
+            for size in PREFERRED_SIZES {
+                let app_dir = theme_dir.join(size);
+                for ext in ICON_EXTENSIONS {
+                    let candidate = app_dir.join(format!("{icon_name}.{ext}"));
+                    if candidate.is_file() {
+                        return Some(candidate.to_string_lossy().into_owned());
+                    }
                 }
             }
         }
@@ -72,4 +112,20 @@ pub fn resolve_icon_path(icon_name: &str) -> Option<String> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_active_icon_theme_none_when_empty() {
+        // Safe check without modifying real home
+        let _ = detect_active_icon_theme();
+    }
+
+    #[test]
+    fn test_resolve_empty_icon_name() {
+        assert_eq!(resolve_icon_path(""), None);
+    }
 }

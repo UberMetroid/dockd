@@ -19,6 +19,9 @@ PanelWindow {
     property bool dockVisible: true
     property var dockItems: []
     property string activeAddress: ""
+    property bool overlap: false
+    property bool filterMonitor: false
+    property var theme: null
 
     // Layer-shell geometry
     anchors.bottom: true
@@ -31,6 +34,8 @@ PanelWindow {
 
     color: "transparent"
 
+    readonly property bool isDockHidden: settingsPopup.autoHide && root.overlap && !dockHoverArea.containsMouse
+
     // Background pill/taskbar styling
     Rectangle {
         id: dockBar
@@ -39,9 +44,29 @@ PanelWindow {
         width: contentRow.implicitWidth + 16
 
         radius: root.profile === "windows" ? 0 : 16
-        color: root.profile === "windows" ? "#0f172a" : Qt.rgba(0.06, 0.09, 0.16, 0.85)
-        border.color: Qt.rgba(1, 1, 1, 0.12)
+        color: root.profile === "windows"
+            ? ((root.theme && root.theme.background) ? root.theme.background : "#0f172a")
+            : ((root.theme && root.theme.background) ? Qt.rgba(0.06, 0.09, 0.16, 0.88) : Qt.rgba(0.06, 0.09, 0.16, 0.85))
+        border.color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.12)
         border.width: root.profile === "windows" ? 0 : 1
+
+        opacity: root.isDockHidden ? 0.2 : 1.0
+        transform: Translate {
+            y: root.isDockHidden ? 44 : 0
+            Behavior on y {
+                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+            }
+        }
+        Behavior on opacity {
+            NumberAnimation { duration: 180 }
+        }
+
+        MouseArea {
+            id: dockHoverArea
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.NoButton
+        }
 
         RowLayout {
             id: contentRow
@@ -58,6 +83,9 @@ PanelWindow {
                     iconPath: modelData.icon_path || ""
                     running: modelData.running || false
                     focused: modelData.focused || false
+                    urgent: modelData.urgent || false
+                    windows: modelData.windows || []
+                    theme: root.theme
                     activeCount: modelData.active_count || 0
                     badgeCount: modelData.badge_count || 0
                     profile: root.profile
@@ -72,6 +100,12 @@ PanelWindow {
                         appMenu.itemData = modelData
                         appMenu.popup(this, mx, my)
                     }
+                    onFocusWindow: function(addr) {
+                        dockRpc.sendAction("focus", { address: addr })
+                    }
+                    onCloseWindow: function(addr) {
+                        dockRpc.sendAction("close", { address: addr })
+                    }
                 }
             }
 
@@ -80,7 +114,7 @@ PanelWindow {
                 visible: root.fileShortcuts && root.dockItems.length > 0
                 width: 1
                 height: 28
-                color: Qt.rgba(1, 1, 1, 0.15)
+                color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.15)
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: 4
                 Layout.rightMargin: 4
@@ -92,6 +126,7 @@ PanelWindow {
                 name: "Home"
                 iconPath: "/usr/share/icons/hicolor/scalable/apps/user-home.svg"
                 profile: root.profile
+                theme: root.theme
                 onClicked: dockRpc.sendAction("open_location", { target: "home" })
             }
 
@@ -101,6 +136,7 @@ PanelWindow {
                 name: "Downloads"
                 iconPath: "/usr/share/icons/hicolor/scalable/apps/folder-download.svg"
                 profile: root.profile
+                theme: root.theme
                 onClicked: dockRpc.sendAction("open_location", { target: "downloads" })
             }
 
@@ -110,6 +146,7 @@ PanelWindow {
                 name: "Trash"
                 iconPath: "/usr/share/icons/hicolor/scalable/apps/user-trash.svg"
                 profile: root.profile
+                theme: root.theme
                 onClicked: dockRpc.sendAction("open_location", { target: "trash" })
             }
         }
@@ -128,12 +165,22 @@ PanelWindow {
         id: settingsPopup
         currentProfile: root.profile
         showFileShortcuts: root.fileShortcuts
+        filterCurrentMonitor: root.filterMonitor
         onProfileChanged: function(p) {
             root.profile = p
-            dockRpc.sendAction("set_profile", { profile: p })
+            dockRpc.sendAction("profile", { profile: p })
         }
         onFileShortcutsToggled: function(enabled) {
             root.fileShortcuts = enabled
+        }
+        onFilterCurrentMonitorToggled: function(enabled) {
+            root.filterMonitor = enabled
+            if (enabled) {
+                var monId = root.shell?.screen?.id ?? 0
+                dockRpc.sendAction("monitor", { monitor_id: monId.toString() })
+            } else {
+                dockRpc.sendAction("monitor", { monitor_id: "all" })
+            }
         }
     }
 
@@ -151,6 +198,7 @@ PanelWindow {
                 else if (params.address) args.push(params.address)
                 else if (params.target) args.push(params.target)
                 else if (params.profile) args.push(params.profile)
+                else if (params.monitor_id !== undefined) args.push(params.monitor_id.toString())
             }
             clientProcess.command = [dockRpc.helperPath].concat(args)
             clientProcess.running = true
@@ -192,6 +240,12 @@ PanelWindow {
                         }
                         if (parsed.active_address) {
                             root.activeAddress = parsed.active_address
+                        }
+                        if (parsed.overlap !== undefined) {
+                            root.overlap = parsed.overlap
+                        }
+                        if (parsed.theme) {
+                            root.theme = parsed.theme
                         }
                     } catch (e) {
                         // ignore partial read

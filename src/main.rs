@@ -66,6 +66,14 @@ fn send_client_command(args: &[String]) -> Result<String, String> {
             let id = args.get(1).ok_or("Provide desktop ID to unpin")?;
             format!("{{\"action\":\"unpin\",\"desktop_id\":\"{id}\"}}")
         }
+        "reorder" => {
+            let id = args.get(1).ok_or("Provide desktop ID to reorder")?;
+            let idx = args.get(2).ok_or("Provide target index (0-based)")?;
+            let idx_num: usize = idx
+                .parse()
+                .map_err(|_| "Target index must be a non-negative integer".to_string())?;
+            format!("{{\"action\":\"reorder\",\"desktop_id\":\"{id}\",\"index\":{idx_num}}}")
+        }
         "focus" => {
             let addr = args.get(1).ok_or("Provide window address to focus")?;
             format!("{{\"action\":\"focus\",\"address\":\"{addr}\"}}")
@@ -95,6 +103,17 @@ fn send_client_command(args: &[String]) -> Result<String, String> {
                 .get(1)
                 .ok_or("Provide layout profile: general, windows, or mac")?;
             format!("{{\"action\":\"set_profile\",\"profile\":\"{p}\"}}")
+        }
+        "monitor" | "filter-monitor" => {
+            let id = args.get(1).ok_or("Provide monitor ID or 'all'")?;
+            if id == "all" || id == "none" || id == "-1" {
+                "{\"action\":\"set_monitor_filter\",\"monitor_id\":null}".to_string()
+            } else {
+                let mon_num: i64 = id
+                    .parse()
+                    .map_err(|_| "Monitor ID must be an integer".to_string())?;
+                format!("{{\"action\":\"set_monitor_filter\",\"monitor_id\":{mon_num}}}")
+            }
         }
         other => return Err(format!("Unknown command '{other}'. Run dockd --help")),
     };
@@ -128,6 +147,8 @@ fn print_help() {
     println!("  dockd float <address>            Set window to floating layout");
     println!("  dockd pin <desktop-id>           Pin application to dock");
     println!("  dockd unpin <desktop-id>         Unpin application from dock");
+    println!("  dockd reorder <desktop-id> <idx> Reorder pinned application to index");
+    println!("  dockd monitor <id|all>           Filter dock windows by monitor ID");
     println!("  dockd profile <general|windows|mac> Set layout preset profile");
     println!("  dockd --version                  Show version");
     println!("  dockd --help                     Show this help");

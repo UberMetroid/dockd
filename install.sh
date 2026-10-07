@@ -3,12 +3,27 @@
 # Supports both:
 #   1. Web installation:  curl -fsSL https://raw.githubusercontent.com/UberMetroid/dockd/main/install.sh | bash
 #   2. Local repository:  ./install.sh
+#   3. Direct uninstallation: ./install.sh --uninstall
 set -euo pipefail
 
 REPO="UberMetroid/dockd"
 BRANCH="main"
 RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 RELEASE_BASE="https://github.com/${REPO}/releases/latest/download"
+
+# Support --uninstall flag directly
+for arg in "$@"; do
+    if [ "$arg" = "--uninstall" ]; then
+        shift
+        if [ -f "$(dirname "${BASH_SOURCE[0]:-$0}")/uninstall.sh" ]; then
+            exec "$(dirname "${BASH_SOURCE[0]:-$0}")/uninstall.sh" "$@"
+        else
+            echo "Fetching uninstaller from ${REPO}..."
+            curl -fsSL "${RAW_BASE}/uninstall.sh" | bash -s -- "$@"
+            exit $?
+        fi
+    fi
+done
 
 BIN_TARGET="${HOME}/.local/bin"
 PLUGIN_TARGET="${HOME}/.config/omarchy/plugins/org.ubermetroid.dockd"
@@ -56,6 +71,11 @@ if [ "${IS_LOCAL}" -eq 1 ]; then
     info "Installing systemd user service and socket units..."
     cp -f "${SCRIPT_DIR}/systemd/user/dockd.service" "${SYSTEMD_TARGET}/"
     cp -f "${SCRIPT_DIR}/systemd/user/dockd.socket" "${SYSTEMD_TARGET}/"
+
+    info "Installing clean uninstaller..."
+    cp -f "${SCRIPT_DIR}/uninstall.sh" "${PLUGIN_TARGET}/uninstall.sh"
+    chmod +x "${PLUGIN_TARGET}/uninstall.sh"
+    ln -sf "${PLUGIN_TARGET}/uninstall.sh" "${BIN_TARGET}/dockd-uninstall"
 else
     info "Running web installer from ${REPO}..."
     ARCH=$(uname -m)
@@ -91,6 +111,11 @@ else
     info "Fetching systemd user units..."
     curl -fsSL -o "${SYSTEMD_TARGET}/dockd.service" "${RAW_BASE}/systemd/user/dockd.service"
     curl -fsSL -o "${SYSTEMD_TARGET}/dockd.socket" "${RAW_BASE}/systemd/user/dockd.socket"
+
+    info "Fetching clean uninstaller..."
+    curl -fsSL -o "${PLUGIN_TARGET}/uninstall.sh" "${RAW_BASE}/uninstall.sh"
+    chmod +x "${PLUGIN_TARGET}/uninstall.sh"
+    ln -sf "${PLUGIN_TARGET}/uninstall.sh" "${BIN_TARGET}/dockd-uninstall"
 fi
 
 chmod +x "${BIN_TARGET}/dockd"
@@ -103,6 +128,7 @@ fi
 ok "dockd successfully installed to ${BIN_TARGET}/dockd"
 ok "Omarchy plugin installed to ${PLUGIN_TARGET}"
 ok "systemd units installed to ${SYSTEMD_TARGET}"
+ok "Uninstaller installed to ${BIN_TARGET}/dockd-uninstall"
 echo ""
 echo "To start dockd via socket activation:"
 echo "  systemctl --user enable --now dockd.socket"

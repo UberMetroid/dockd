@@ -5,7 +5,7 @@ pub mod monitor_layout;
 pub mod query_state;
 pub mod socket_path;
 
-pub use client_table::HyprClient;
+pub use client_table::{HyprClient, normalize_addr};
 pub use dispatch_command::*;
 pub use listen_events::{EventListener, HyprEvent};
 pub use monitor_layout::HyprMonitor;
