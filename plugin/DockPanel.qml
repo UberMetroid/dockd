@@ -1,6 +1,6 @@
 import QtQuick
-import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -9,7 +9,7 @@ import "components"
 PanelWindow {
     id: root
 
-    // Host properties injected by Omarchy plugin loader
+    // Host properties injected by Omarchy Shell
     property var shell: null
     property var manifest: null
 
@@ -18,7 +18,7 @@ PanelWindow {
         {
             desktop_id: "nautilus.desktop",
             name: "Files",
-            icon_path: "/usr/share/icons/hicolor/scalable/apps/system-file-manager.svg",
+            icon_path: "/usr/share/icons/hicolor/scalable/apps/org.gnome.Nautilus.svg",
             running: false,
             focused: false,
             urgent: false,
@@ -48,10 +48,12 @@ PanelWindow {
     ]
 
     // Dock configuration state
-    property string profile: "general"
-    property bool fileShortcuts: false
+    property string profile: "mac"
+    property string dockSize: "medium" // "small", "medium", "large"
+    property bool magnification: true
+    property bool showIndicators: true
     property bool autoHide: true
-    property bool dockVisible: true
+    property bool proximityActive: false
     property var dockItems: defaultDockItems
     property string activeAddress: ""
     property bool overlap: false
@@ -59,28 +61,45 @@ PanelWindow {
     property bool filterMonitor: false
     property var theme: null
 
-    // Layer-shell geometry
+    // Geometry calculations based on dockSize
+    readonly property real dockHeight: dockSize === "small" ? 48 : (dockSize === "large" ? 68 : 56)
+    readonly property real slotDimension: dockSize === "small" ? 40 : (dockSize === "large" ? 58 : 48)
+    readonly property real iconDimension: dockSize === "small" ? 28 : (dockSize === "large" ? 44 : 36)
+
+    // Layer-shell geometry: centered horizontally at bottom of screen with floating margin
     anchors {
         bottom: true
     }
     margins {
-        bottom: root.profile === "windows" ? 0 : 8
+        bottom: 8
     }
-    exclusiveZone: root.profile === "windows" ? implicitHeight : -1
+    exclusiveZone: -1
 
-    WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.layer: root.autoHide ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.namespace: "dockd"
 
     implicitWidth: dockBar.implicitWidth + 32
-    implicitHeight: root.profile === "windows" ? 52 : 64
+    implicitHeight: root.dockHeight + 20
 
     color: "transparent"
 
-    // Intellihide: hides when windows exist on screen, pops up on mouse proximity or empty desktop
+    // Intellihide: hides when windows exist on screen, reveals on mouse proximity or empty desktop
     readonly property bool isDockHidden: {
         if (!root.autoHide) return false
-        if (proximityTrigger.containsMouse || dockHoverArea.containsMouse) return false
+        if (root.proximityActive || dockHoverArea.containsMouse || settingsPopup.visible || appMenu.visible) return false
         return (root.overlap || root.hasWindows)
+    }
+
+    // Auto-hide hysteresis timer to prevent abrupt snapping
+    Timer {
+        id: autohideTimer
+        interval: 350
+        repeat: false
+        onTriggered: {
+            if (!dockHoverArea.containsMouse && !proximityTrigger.containsMouse) {
+                root.proximityActive = false
+            }
+        }
     }
 
     // Screen edge proximity trigger spanning the bottom area
@@ -90,33 +109,42 @@ PanelWindow {
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
         z: 1
+        onEntered: {
+            autohideTimer.stop()
+            root.proximityActive = true
+        }
+        onExited: {
+            autohideTimer.restart()
+        }
     }
 
-    // Background pill/taskbar styling
+    // Background macOS frosted glass pill
     Rectangle {
         id: dockBar
         anchors.centerIn: parent
-        height: root.profile === "windows" ? 48 : 54
-        implicitWidth: contentRow.implicitWidth + 20
+        height: root.dockHeight
+        implicitWidth: contentRow.implicitWidth + 18
         width: implicitWidth
         z: 2
 
-        radius: root.profile === "windows" ? 0 : 16
-        color: root.profile === "windows"
-            ? ((root.theme && root.theme.background) ? root.theme.background : "#0f172a")
-            : ((root.theme && root.theme.background) ? Qt.rgba(0.06, 0.09, 0.16, 0.88) : Qt.rgba(0.06, 0.09, 0.16, 0.85))
-        border.color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.12)
-        border.width: root.profile === "windows" ? 0 : 1
+        radius: 18
+        color: (root.theme && root.theme.background)
+            ? Qt.rgba(0.08, 0.11, 0.16, 0.78)
+            : Qt.rgba(0.08, 0.11, 0.16, 0.78)
+        border.color: (root.theme && root.theme.border)
+            ? root.theme.border
+            : Qt.rgba(1, 1, 1, 0.15)
+        border.width: 1
 
         opacity: root.isDockHidden ? 0.0 : 1.0
         transform: Translate {
-            y: root.isDockHidden ? (root.height - 2) : 0
+            y: root.isDockHidden ? (root.height + 12) : 0
             Behavior on y {
-                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
             }
         }
         Behavior on opacity {
-            NumberAnimation { duration: 160 }
+            NumberAnimation { duration: 180 }
         }
 
         MouseArea {
@@ -124,6 +152,13 @@ PanelWindow {
             anchors.fill: parent
             hoverEnabled: true
             acceptedButtons: Qt.RightButton
+            onEntered: {
+                autohideTimer.stop()
+                root.proximityActive = true
+            }
+            onExited: {
+                autohideTimer.restart()
+            }
             onClicked: function(mouse) {
                 if (mouse.button === Qt.RightButton) {
                     settingsPopup.popup(dockBar, mouse.x, mouse.y)
@@ -134,47 +169,52 @@ PanelWindow {
         RowLayout {
             id: contentRow
             anchors.centerIn: parent
-            spacing: root.profile === "mac" ? 8 : 4
+            spacing: 6
 
-            // 1. App Launcher Button (Applications drawer)
+            // 1. App Launcher / Launchpad Button
             Item {
                 id: launcherBtn
-                width: 44
-                height: 44
+                width: root.slotDimension
+                height: root.slotDimension
                 Layout.alignment: Qt.AlignVCenter
 
                 Rectangle {
                     id: launcherPlate
                     anchors.centerIn: parent
-                    width: 38
-                    height: 38
-                    radius: root.profile === "windows" ? 4 : 12
+                    width: root.slotDimension - 8
+                    height: root.slotDimension - 8
+                    radius: 12
                     color: launcherMouse.containsMouse
-                        ? ((root.theme && root.theme.accent) ? Qt.rgba(0.22, 0.74, 0.97, 0.25) : Qt.rgba(1, 1, 1, 0.15))
-                        : Qt.rgba(1, 1, 1, 0.07)
+                        ? ((root.theme && root.theme.accent) ? Qt.rgba(0.22, 0.74, 0.97, 0.25) : Qt.rgba(1, 1, 1, 0.18))
+                        : Qt.rgba(1, 1, 1, 0.08)
                     border.color: launcherMouse.containsMouse
                         ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
                         : Qt.rgba(1, 1, 1, 0.12)
                     border.width: 1
 
-                    scale: launcherMouse.containsMouse ? 1.08 : 1.0
-                    Behavior on scale { NumberAnimation { duration: 100 } }
+                    scale: launcherMouse.pressed ? 0.92 : (launcherMouse.containsMouse && root.magnification ? 1.18 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
-                    // 9-dot launcher grid icon
+                    transform: Translate {
+                        y: (root.magnification && launcherMouse.containsMouse && !launcherMouse.pressed) ? -4 : 0
+                        Behavior on y { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    }
+
+                    // 9-dot silver grid icon (macOS Launchpad style)
                     Grid {
                         anchors.centerIn: parent
                         columns: 3
-                        spacing: 4
+                        spacing: 3
 
                         Repeater {
                             model: 9
                             Rectangle {
-                                width: 4
-                                height: 4
-                                radius: 2
+                                width: 3.5
+                                height: 3.5
+                                radius: 1.75
                                 color: launcherMouse.containsMouse
                                     ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
-                                    : ((root.theme && root.theme.foreground) ? root.theme.foreground : "#f8fafc")
+                                    : "#ffffff"
                             }
                         }
                     }
@@ -195,18 +235,18 @@ PanelWindow {
                 }
 
                 ToolTip.visible: launcherMouse.containsMouse
-                ToolTip.text: "Applications (Super + Space)"
+                ToolTip.text: "Applications (Launchpad)"
                 ToolTip.delay: 300
             }
 
             // Separator after App Launcher
             Rectangle {
                 width: 1
-                height: 24
+                height: Math.round(root.dockHeight * 0.45)
                 color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.15)
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: 2
-                Layout.rightMargin: 4
+                Layout.rightMargin: 2
             }
 
             // 2. Application launcher & running window icons
@@ -225,6 +265,10 @@ PanelWindow {
                     activeCount: modelData.active_count || 0
                     badgeCount: modelData.badge_count || 0
                     profile: root.profile
+                    slotSize: root.slotDimension
+                    iconSize: root.iconDimension
+                    magnification: root.magnification
+                    showIndicators: root.showIndicators
 
                     onClicked: {
                         dockRpc.sendAction("toggle", { desktop_id: modelData.desktop_id })
@@ -245,45 +289,70 @@ PanelWindow {
                 }
             }
 
-            // Separator before file shortcuts (hidden when shortcuts disabled)
+            // Separator before Quick Settings
             Rectangle {
-                visible: root.fileShortcuts && root.dockItems.length > 0
                 width: 1
-                height: 24
+                height: Math.round(root.dockHeight * 0.45)
                 color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.15)
                 Layout.alignment: Qt.AlignVCenter
-                Layout.leftMargin: 4
-                Layout.rightMargin: 4
+                Layout.leftMargin: 2
+                Layout.rightMargin: 2
             }
 
-            // File shortcut: Home
-            DockIcon {
-                visible: root.fileShortcuts
-                name: "Home"
-                iconPath: "/usr/share/icons/hicolor/scalable/apps/user-home.svg"
-                profile: root.profile
-                theme: root.theme
-                onClicked: dockRpc.sendAction("open_location", { target: "home" })
-            }
+            // 3. Quick Settings Button
+            Item {
+                id: settingsBtn
+                width: root.slotDimension
+                height: root.slotDimension
+                Layout.alignment: Qt.AlignVCenter
 
-            // File shortcut: Downloads
-            DockIcon {
-                visible: root.fileShortcuts
-                name: "Downloads"
-                iconPath: "/usr/share/icons/hicolor/scalable/apps/folder-download.svg"
-                profile: root.profile
-                theme: root.theme
-                onClicked: dockRpc.sendAction("open_location", { target: "downloads" })
-            }
+                Rectangle {
+                    id: settingsPlate
+                    anchors.centerIn: parent
+                    width: root.slotDimension - 8
+                    height: root.slotDimension - 8
+                    radius: 12
+                    color: settingsMouse.containsMouse
+                        ? ((root.theme && root.theme.accent) ? Qt.rgba(0.22, 0.74, 0.97, 0.25) : Qt.rgba(1, 1, 1, 0.18))
+                        : Qt.rgba(1, 1, 1, 0.08)
+                    border.color: settingsMouse.containsMouse
+                        ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
+                        : Qt.rgba(1, 1, 1, 0.12)
+                    border.width: 1
 
-            // File shortcut: Trash
-            DockIcon {
-                visible: root.fileShortcuts
-                name: "Trash"
-                iconPath: "/usr/share/icons/hicolor/scalable/apps/user-trash.svg"
-                profile: root.profile
-                theme: root.theme
-                onClicked: dockRpc.sendAction("open_location", { target: "trash" })
+                    scale: settingsMouse.pressed ? 0.92 : (settingsMouse.containsMouse && root.magnification ? 1.18 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+
+                    transform: Translate {
+                        y: (root.magnification && settingsMouse.containsMouse && !settingsMouse.pressed) ? -4 : 0
+                        Behavior on y { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    }
+
+                    // Gear / Control Center Sliders Icon
+                    Text {
+                        anchors.centerIn: parent
+                        text: "⚙"
+                        font.pixelSize: Math.round(root.iconDimension * 0.55)
+                        color: settingsMouse.containsMouse
+                            ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
+                            : "#cbd5e1"
+                    }
+                }
+
+                MouseArea {
+                    id: settingsMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    onClicked: {
+                        settingsPopup.popup(settingsBtn, 0, -settingsPopup.height - 10)
+                    }
+                }
+
+                ToolTip.visible: settingsMouse.containsMouse
+                ToolTip.text: "Dock Preferences"
+                ToolTip.delay: 300
             }
         }
     }
@@ -296,23 +365,31 @@ PanelWindow {
         }
     }
 
-    // Settings Popup
+    // macOS Style Dock Preferences Popup
     SettingsPopup {
         id: settingsPopup
-        currentProfile: root.profile
-        showFileShortcuts: root.fileShortcuts
+        dockSize: root.dockSize
+        magnification: root.magnification
         autoHide: root.autoHide
+        showIndicators: root.showIndicators
         filterCurrentMonitor: root.filterMonitor
-        onProfileChanged: function(p) {
-            root.profile = p
-            dockRpc.sendAction("profile", { profile: p })
+        theme: root.theme
+
+        onDockSizeChanged: function(size) {
+            root.dockSize = size
+            dockRpc.sendAction("size", { size: size })
         }
-        onFileShortcutsToggled: function(enabled) {
-            root.fileShortcuts = enabled
+        onMagnificationToggled: function(enabled) {
+            root.magnification = enabled
+            dockRpc.sendAction("magnification", { enabled: enabled })
         }
         onAutoHideToggled: function(enabled) {
             root.autoHide = enabled
             dockRpc.sendAction("autohide", { enabled: enabled })
+        }
+        onShowIndicatorsToggled: function(enabled) {
+            root.showIndicators = enabled
+            dockRpc.sendAction("set_show_indicators", { show_indicators: enabled })
         }
         onFilterCurrentMonitorToggled: function(enabled) {
             root.filterMonitor = enabled
@@ -322,6 +399,9 @@ PanelWindow {
             } else {
                 dockRpc.sendAction("monitor", { monitor_id: "all" })
             }
+        }
+        onResetPinnedTriggered: function() {
+            dockRpc.sendAction("reset", {})
         }
     }
 
@@ -352,7 +432,8 @@ PanelWindow {
             ensureDaemon()
             var args = [actionName]
             if (params) {
-                if (params.desktop_id) args.push(params.desktop_id)
+                if (params.size) args.push(params.size)
+                else if (params.desktop_id) args.push(params.desktop_id)
                 else if (params.address) args.push(params.address)
                 else if (params.target) args.push(params.target)
                 else if (params.profile) args.push(params.profile)
@@ -404,6 +485,15 @@ PanelWindow {
                         }
                         if (parsed.profile) {
                             root.profile = parsed.profile
+                        }
+                        if (parsed.dock_size) {
+                            root.dockSize = parsed.dock_size
+                        }
+                        if (parsed.magnification !== undefined) {
+                            root.magnification = parsed.magnification
+                        }
+                        if (parsed.show_indicators !== undefined) {
+                            root.showIndicators = parsed.show_indicators
                         }
                         if (parsed.active_address) {
                             root.activeAddress = parsed.active_address

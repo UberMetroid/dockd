@@ -15,7 +15,11 @@ Item {
     property var theme: null
     property int activeCount: 0
     property int badgeCount: 0
-    property string profile: "general" // "general", "windows", "mac"
+    property string profile: "mac" // "general", "windows", "mac"
+    property real slotSize: 48
+    property real iconSize: 36
+    property bool magnification: true
+    property bool showIndicators: true
 
     signal clicked()
     signal middleClicked()
@@ -23,20 +27,28 @@ Item {
     signal focusWindow(string address)
     signal closeWindow(string address)
 
-    width: 48
-    height: 48
+    width: slotSize
+    height: slotSize
 
     readonly property bool isHovered: mouseArea.containsMouse || previewPopup.hovered
     readonly property real scaleFactor: {
-        if (profile === "mac" && isHovered) return 1.25
-        if (isHovered) return 1.10
+        if (mouseArea.pressed) return 0.92
+        if (root.magnification && isHovered) return 1.25
+        if (isHovered) return 1.08
         return 1.0
     }
 
     Behavior on scale {
-        NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
+        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
     }
     scale: scaleFactor
+
+    transform: Translate {
+        y: (root.magnification && root.isHovered && !mouseArea.pressed) ? -6 : 0
+        Behavior on y {
+            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+        }
+    }
 
     // Urgency Pulse Aura
     Rectangle {
@@ -82,18 +94,20 @@ Item {
     Image {
         id: iconImg
         anchors.centerIn: parent
-        width: 36
-        height: 36
+        width: root.iconSize
+        height: root.iconSize
         source: {
             if (!root.iconPath || root.iconPath.length === 0) return ""
             if (root.iconPath.indexOf("://") !== -1) return root.iconPath
             if (root.iconPath.charAt(0) === "/") return "file://" + root.iconPath
             return "image://icon/" + root.iconPath
         }
-        sourceSize.width: 48
-        sourceSize.height: 48
+        sourceSize.width: Math.max(64, root.iconSize * 2)
+        sourceSize.height: Math.max(64, root.iconSize * 2)
         fillMode: Image.PreserveAspectFit
         asynchronous: true
+        smooth: true
+        mipmap: true
 
         // Fallback letter glyph if icon missing
         Rectangle {
@@ -106,7 +120,7 @@ Item {
                 text: root.name.length > 0 ? root.name.charAt(0).toUpperCase() : "?"
                 color: (root.theme && root.theme.foreground) ? root.theme.foreground : "#f8fafc"
                 font.bold: true
-                font.pixelSize: 18
+                font.pixelSize: Math.round(root.iconSize * 0.45)
             }
         }
     }
@@ -114,17 +128,24 @@ Item {
     // Running indicator dot / pill
     Rectangle {
         id: runningDot
-        visible: root.running
+        visible: root.showIndicators && root.running
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 2
-        width: root.profile === "windows" ? (root.focused ? 18 : 8) : (root.activeCount > 1 ? 8 : 5)
-        height: root.profile === "windows" ? 3 : 5
-        radius: 2.5
-        color: root.focused ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8") : Qt.rgba(1, 1, 1, 0.7)
+        width: root.focused ? 12 : 4
+        height: 3
+        radius: 1.5
+        color: root.urgent
+            ? ((root.theme && root.theme.urgent) ? root.theme.urgent : "#ef4444")
+            : (root.focused
+                ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
+                : Qt.rgba(1, 1, 1, 0.65))
 
         Behavior on width {
-            NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+        }
+        Behavior on color {
+            ColorAnimation { duration: 150 }
         }
     }
 

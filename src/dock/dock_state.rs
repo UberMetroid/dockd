@@ -1,9 +1,6 @@
 //! Central state management for dock launchers, layout profiles, and active windows.
-//!
-//! Synchronizes Hyprland client updates with pinned applications, theme, and urgency tracking.
-
 use super::dock_item::{DockItem, WindowSummary};
-use super::pinned_store::{load_pinned_ids, reorder_pinned_ids, save_pinned_ids};
+use super::pinned_store::{default_pinned, load_pinned_ids, reorder_pinned_ids, save_pinned_ids};
 use crate::hyprland::client_table::{HyprClient, normalize_addr};
 use crate::syntax::json_value::JsonValue;
 use crate::system::resolve_icon::resolve_icon_path;
@@ -16,6 +13,9 @@ pub struct DockState {
     pub desktop_entries: Vec<DesktopEntry>,
     pub pinned_ids: Vec<String>,
     pub profile: String,
+    pub dock_size: String,
+    pub magnification: bool,
+    pub show_indicators: bool,
     pub items: Vec<DockItem>,
     pub active_address: Option<String>,
     pub urgent_addresses: BTreeSet<String>,
@@ -37,7 +37,10 @@ impl DockState {
         let mut state = Self {
             desktop_entries: scan_desktop_entries(),
             pinned_ids: load_pinned_ids(),
-            profile: "general".to_string(),
+            profile: "mac".to_string(),
+            dock_size: "medium".to_string(),
+            magnification: true,
+            show_indicators: true,
             items: Vec::new(),
             active_address: None,
             urgent_addresses: BTreeSet::new(),
@@ -72,33 +75,25 @@ impl DockState {
             let icon_path = resolve_icon_path(icon_raw).unwrap_or_default();
             let wm_class = entry.and_then(|e| e.wm_class.clone()).unwrap_or_default();
 
-            let mut windows = Vec::new();
-            for (idx, client) in clients.iter().enumerate() {
-                if self.filter_monitor.is_some_and(|m| client.monitor_id != m) {
-                    continue;
-                }
-                let matches = (!wm_class.is_empty() && client.matches_app(&wm_class))
-                    || client.matches_app(id)
-                    || (!name.is_empty() && client.matches_app(&name));
-                if matches {
-                    matched_clients.insert(idx);
-                    let urg = self.is_address_urgent(&client.address);
-                    windows.push(WindowSummary::from_client(client, active_addr, urg));
-                }
-            }
+            let windows = DockItem::match_windows(
+                clients,
+                &wm_class,
+                id,
+                &name,
+                self.filter_monitor,
+                active_addr,
+                |a| self.is_address_urgent(a),
+                &mut matched_clients,
+            );
 
-            let is_urgent = windows.iter().any(|w| w.urgent);
-            new_items.push(DockItem {
-                desktop_id: id.clone(),
+            new_items.push(DockItem::new_pinned(
+                id.clone(),
                 name,
                 icon_path,
                 exec_cmd,
                 wm_class,
-                pinned: true,
-                urgent: is_urgent,
                 windows,
-                badge_count: 0,
-            });
+            ));
         }
 
         // 2. Running unpinned items
@@ -138,17 +133,15 @@ impl DockState {
                 }
                 existing.windows.push(win);
             } else {
-                new_items.push(DockItem {
-                    desktop_id: id,
+                new_items.push(DockItem::new_unpinned(
+                    id,
                     name,
                     icon_path,
                     exec_cmd,
                     wm_class,
-                    pinned: false,
-                    urgent: urg,
-                    windows: vec![win],
-                    badge_count: 0,
-                });
+                    urg,
+                    vec![win],
+                ));
             }
         }
 
@@ -188,37 +181,50 @@ impl DockState {
     pub fn clear_urgent(&mut self, addr: &str) {
         self.urgent_addresses.remove(&normalize_addr(addr));
     }
-    pub fn clear_all_urgent(&mut self) {
-        self.urgent_addresses.clear();
-    }
+    #[rustfmt::skip]
+    pub fn clear_all_urgent(&mut self) { self.urgent_addresses.clear(); }
     pub fn is_address_urgent(&self, addr: &str) -> bool {
         self.urgent_addresses.contains(&normalize_addr(addr))
     }
 
-    pub fn set_filter_monitor(&mut self, monitor_id: Option<i64>) {
-        self.filter_monitor = monitor_id;
-    }
-    pub fn set_profile(&mut self, profile: &str) {
-        self.profile = profile.to_string();
-    }
-    pub fn set_autohide(&mut self, enabled: bool) {
-        self.autohide = enabled;
-    }
-    pub fn sync_theme(&mut self) {
-        self.theme = load_omarchy_theme();
-    }
+    #[rustfmt::skip]
+    pub fn set_filter_monitor(&mut self, m: Option<i64>) { self.filter_monitor = m; }
+    #[rustfmt::skip]
+    pub fn set_profile(&mut self, p: &str) { self.profile = p.to_string(); }
+    #[rustfmt::skip]
+    pub fn set_autohide(&mut self, a: bool) { self.autohide = a; }
+    #[rustfmt::skip]
+    pub fn set_dock_size(&mut self, s: &str) { self.dock_size = s.to_string(); }
+    #[rustfmt::skip]
+    pub fn set_magnification(&mut self, m: bool) { self.magnification = m; }
+    #[rustfmt::skip]
+    pub fn set_show_indicators(&mut self, i: bool) { self.show_indicators = i; }
+    #[rustfmt::skip]
+    pub fn sync_theme(&mut self) { self.theme = load_omarchy_theme(); }
+
+    #[rustfmt::skip]
+    pub fn reset_pinned(&mut self) { self.pinned_ids = default_pinned(); save_pinned_ids(&self.pinned_ids); }
 
     pub fn to_json(&self) -> JsonValue {
         let mut map = BTreeMap::new();
         map.insert("profile".into(), JsonValue::String(self.profile.clone()));
+        map.insert(
+            "dock_size".into(),
+            JsonValue::String(self.dock_size.clone()),
+        );
+        map.insert("magnification".into(), JsonValue::Bool(self.magnification));
+        map.insert(
+            "show_indicators".into(),
+            JsonValue::Bool(self.show_indicators),
+        );
         let active = self
             .active_address
-            .as_ref()
-            .map_or(JsonValue::Null, |a| JsonValue::String(a.clone()));
-        map.insert("active_address".into(), active);
+            .as_deref()
+            .map_or(JsonValue::Null, |a| JsonValue::String(a.to_string()));
         let mon = self
             .filter_monitor
             .map_or(JsonValue::Null, |m| JsonValue::Number(m as f64));
+        map.insert("active_address".into(), active);
         map.insert("filter_monitor".into(), mon);
         map.insert("overlap".into(), JsonValue::Bool(self.overlap));
         map.insert("has_windows".into(), JsonValue::Bool(self.has_windows));
@@ -235,18 +241,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_urgency_tracking() {
+    fn test_dock_state_features() {
         let mut state = DockState::new();
         state.mark_urgent("0x559e2a80");
-        assert!(state.is_address_urgent("0x559e2a80"));
-        assert!(state.is_address_urgent("559e2a80"));
+        assert!(state.is_address_urgent("0x559e2a80") && state.is_address_urgent("559e2a80"));
         state.clear_urgent("559e2a80");
         assert!(!state.is_address_urgent("0x559e2a80"));
-    }
-
-    #[test]
-    fn test_filter_monitor() {
-        let mut state = DockState::new();
         assert_eq!(state.filter_monitor, None);
         state.set_filter_monitor(Some(1));
         assert_eq!(state.filter_monitor, Some(1));

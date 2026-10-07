@@ -25,7 +25,7 @@ pub fn execute_action(
     match action {
         "get_state" => Ok(state.to_json()),
         "set_profile" => {
-            let prof = req.get_str("profile").unwrap_or("general");
+            let prof = req.get_str("profile").unwrap_or("mac");
             state.set_profile(prof);
             Ok(json_ok("Profile updated"))
         }
@@ -33,6 +33,26 @@ pub fn execute_action(
             let enabled = req.get_bool("enabled").unwrap_or(true);
             state.set_autohide(enabled);
             Ok(json_ok("Autohide updated"))
+        }
+        "set_dock_size" => {
+            let size = req.get_str("size").unwrap_or("medium");
+            state.set_dock_size(size);
+            Ok(json_ok("Dock size updated"))
+        }
+        "set_magnification" => {
+            let mag = req.get_bool("magnification").unwrap_or(true);
+            state.set_magnification(mag);
+            Ok(json_ok("Magnification updated"))
+        }
+        "set_show_indicators" => {
+            let ind = req.get_bool("show_indicators").unwrap_or(true);
+            state.set_show_indicators(ind);
+            Ok(json_ok("Indicators updated"))
+        }
+        "reset_pinned" => {
+            state.reset_pinned();
+            sync_hypr_state(state, hypr_cmd_sock);
+            Ok(json_ok("Pinned reset to defaults"))
         }
         "pin" => {
             let id = req

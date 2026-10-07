@@ -11,23 +11,22 @@ Item {
     implicitWidth: 32
     implicitHeight: 28
 
-    property string profile: "general"
     property string helperPath: (typeof Quickshell !== "undefined" && Quickshell.env("DOCKD_BIN")) ? Quickshell.env("DOCKD_BIN") : "dockd"
 
     Rectangle {
         id: buttonPlate
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : "transparent"
+        color: mouseArea.containsMouse ? Qt.rgba(1, 1, 1, 0.14) : "transparent"
 
         // Dock icon symbol
         Row {
             anchors.centerIn: parent
             spacing: 3
 
-            Rectangle { width: 4; height: 14; radius: 2; color: "#38bdf8" }
-            Rectangle { width: 4; height: 18; radius: 2; color: "#f8fafc" }
-            Rectangle { width: 4; height: 14; radius: 2; color: "#38bdf8" }
+            Rectangle { width: 3.5; height: 12; radius: 1.5; color: "#38bdf8" }
+            Rectangle { width: 3.5; height: 16; radius: 1.5; color: "#ffffff" }
+            Rectangle { width: 3.5; height: 12; radius: 1.5; color: "#38bdf8" }
         }
     }
 
@@ -38,32 +37,31 @@ Item {
         acceptedButtons: Qt.LeftButton | Qt.RightButton
 
         onClicked: function(mouse) {
-            if (mouse.button === Qt.LeftButton || mouse.button === Qt.RightButton) {
-                quickMenu.popup(root, mouse.x, mouse.y)
-            }
+            settingsPopup.popup(buttonPlate, 0, buttonPlate.height + 6)
         }
     }
 
-    Menu {
-        id: quickMenu
-        title: "dockd"
+    ToolTip.visible: mouseArea.containsMouse
+    ToolTip.text: "Dock Preferences"
+    ToolTip.delay: 300
 
-        MenuItem {
-            text: "Layout: General"
-            onTriggered: rpcProcess.execute(["profile", "general"])
+    SettingsPopup {
+        id: settingsPopup
+
+        onDockSizeChanged: function(size) {
+            rpcProcess.execute(["size", size])
         }
-        MenuItem {
-            text: "Layout: Windows Taskbar"
-            onTriggered: rpcProcess.execute(["profile", "windows"])
+        onMagnificationToggled: function(enabled) {
+            rpcProcess.execute(["magnification", enabled ? "on" : "off"])
         }
-        MenuItem {
-            text: "Layout: macOS Style"
-            onTriggered: rpcProcess.execute(["profile", "mac"])
+        onAutoHideToggled: function(enabled) {
+            rpcProcess.execute(["autohide", enabled ? "on" : "off"])
         }
-        MenuSeparator {}
-        MenuItem {
-            text: "Refresh State"
-            onTriggered: rpcProcess.execute(["state"])
+        onFilterCurrentMonitorToggled: function(enabled) {
+            rpcProcess.execute(["monitor", enabled ? "0" : "all"])
+        }
+        onResetPinnedTriggered: function() {
+            rpcProcess.execute(["reset"])
         }
     }
 

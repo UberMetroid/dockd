@@ -4,7 +4,7 @@
 
 use crate::hyprland::client_table::{HyprClient, normalize_addr};
 use crate::syntax::json_value::JsonValue;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WindowSummary {
@@ -74,6 +74,78 @@ pub struct DockItem {
 }
 
 impl DockItem {
+    pub fn new_pinned(
+        id: String,
+        name: String,
+        icon: String,
+        exec: String,
+        wm_class: String,
+        windows: Vec<WindowSummary>,
+    ) -> Self {
+        let urgent = windows.iter().any(|w| w.urgent);
+        Self {
+            desktop_id: id,
+            name,
+            icon_path: icon,
+            exec_cmd: exec,
+            wm_class,
+            pinned: true,
+            urgent,
+            windows,
+            badge_count: 0,
+        }
+    }
+
+    pub fn new_unpinned(
+        id: String,
+        name: String,
+        icon: String,
+        exec: String,
+        wm_class: String,
+        urgent: bool,
+        windows: Vec<WindowSummary>,
+    ) -> Self {
+        Self {
+            desktop_id: id,
+            name,
+            icon_path: icon,
+            exec_cmd: exec,
+            wm_class,
+            pinned: false,
+            urgent,
+            windows,
+            badge_count: 0,
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn match_windows<F: Fn(&str) -> bool>(
+        clients: &[HyprClient],
+        wm_class: &str,
+        id: &str,
+        name: &str,
+        mon: Option<i64>,
+        active: Option<&str>,
+        is_urgent: F,
+        matched: &mut BTreeSet<usize>,
+    ) -> Vec<WindowSummary> {
+        let mut wins = Vec::new();
+        for (idx, client) in clients.iter().enumerate() {
+            if mon.is_some_and(|m| client.monitor_id != m) {
+                continue;
+            }
+            let matches = (!wm_class.is_empty() && client.matches_app(wm_class))
+                || client.matches_app(id)
+                || (!name.is_empty() && client.matches_app(name));
+            if matches {
+                matched.insert(idx);
+                let urg = is_urgent(&client.address);
+                wins.push(WindowSummary::from_client(client, active, urg));
+            }
+        }
+        wins
+    }
+
     pub fn is_running(&self) -> bool {
         !self.windows.is_empty()
     }

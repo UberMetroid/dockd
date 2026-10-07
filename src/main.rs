@@ -109,6 +109,16 @@ fn send_client_command(args: &[String]) -> Result<String, String> {
             let enabled = !matches!(opt, "off" | "false" | "0" | "disable");
             format!("{{\"action\":\"set_autohide\",\"enabled\":{enabled}}}")
         }
+        "size" | "dock-size" => {
+            let s = args.get(1).map(String::as_str).unwrap_or("medium");
+            format!("{{\"action\":\"set_dock_size\",\"size\":\"{s}\"}}")
+        }
+        "magnification" | "zoom" => {
+            let opt = args.get(1).map(String::as_str).unwrap_or("on");
+            let enabled = !matches!(opt, "off" | "false" | "0" | "disable");
+            format!("{{\"action\":\"set_magnification\",\"magnification\":{enabled}}}")
+        }
+        "reset" | "reset-pinned" => "{\"action\":\"reset_pinned\"}".to_string(),
         "monitor" | "filter-monitor" => {
             let id = args.get(1).ok_or("Provide monitor ID or 'all'")?;
             if id == "all" || id == "none" || id == "-1" {
@@ -155,6 +165,11 @@ fn print_help() {
     println!("  dockd reorder <desktop-id> <idx> Reorder pinned application to index");
     println!("  dockd monitor <id|all>           Filter dock windows by monitor ID");
     println!("  dockd autohide <on|off>          Toggle auto-hide when windows are on screen");
+    println!("  dockd size <small|medium|large>  Set dock slot & icon size");
+    println!("  dockd magnification <on|off>     Toggle icon hover magnification");
+    println!(
+        "  dockd reset                      Reset pinned apps to defaults (Files, Browser, Terminal)"
+    );
     println!("  dockd profile <general|windows|mac> Set layout preset profile");
     println!("  dockd --version                  Show version");
     println!("  dockd --help                     Show this help");
