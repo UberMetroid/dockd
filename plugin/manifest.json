@@ -2,15 +2,24 @@
   "schemaVersion": 1,
   "id": "org.ubermetroid.dockd",
   "name": "dockd",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": "UberMetroid",
   "license": "GPL-2.0-or-later",
-  "description": "Desktop application dock and launcher for Omarchy",
+  "description": "macOS-style desktop application dock and launcher for Omarchy",
   "kinds": [
-    "panel"
+    "service",
+    "bar-widget"
   ],
   "keepLoaded": true,
   "entryPoints": {
-    "panel": "DockPanel.qml"
+    "service": "DockPanel.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "dockd",
+    "description": "Application dock and preferences",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
   }
 }

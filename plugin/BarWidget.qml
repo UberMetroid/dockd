@@ -57,6 +57,9 @@ Item {
         onAutoHideToggled: function(enabled) {
             rpcProcess.execute(["autohide", enabled ? "on" : "off"])
         }
+        onShowIndicatorsToggled: function(enabled) {
+            rpcProcess.execute(["set_show_indicators", enabled ? "on" : "off"])
+        }
         onFilterCurrentMonitorToggled: function(enabled) {
             rpcProcess.execute(["monitor", enabled ? "0" : "all"])
         }

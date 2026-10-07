@@ -23,8 +23,8 @@ BRANCH="main"
 CANONICAL_URL="https://ubermetroid.github.io/dockd"
 GITHUB_URL="https://github.com/${REPO}"
 RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
-VERSION_PIN="v0.1.3"
-RAW_VERSION="0.1.3"
+VERSION_PIN="v0.1.4"
+RAW_VERSION="0.1.4"
 RELEASE_BASE="${GITHUB_URL}/releases/download/${VERSION_PIN}"
 
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ] && [ "${TERM:-dumb}" != "dumb" ]; then
@@ -372,14 +372,19 @@ ok "Uninstaller installed to ${BIN_TARGET}/dockd-uninstall"
 
 # Auto-enable in Omarchy and restart shell
 if command -v omarchy >/dev/null 2>&1; then
+    info "Refreshing Omarchy plugin registry..."
+    command -v omarchy-shell >/dev/null 2>&1 && omarchy-shell shell rescanPlugins 2>/dev/null || true
     info "Enabling dockd plugin in Omarchy..."
-    omarchy plugin enable org.ubermetroid.dockd 2>/dev/null || true
-    omarchy restart shell 2>/dev/null || true
+    omarchy plugin enable org.ubermetroid.dockd || true
+    info "Restarting Omarchy shell..."
+    omarchy restart shell || true
     ok "Omarchy dock panel is now active at the bottom of your screen!"
 else
     say ""
     say "${BOLD}Next Steps:${RESET}"
     say "  1. Start socket activation:    ${CYAN}systemctl --user enable --now dockd.socket${RESET}"
-    say "  2. Enable Omarchy dock plugin: ${CYAN}omarchy plugin enable org.ubermetroid.dockd${RESET}"
+    say "  2. Rescan plugins:             ${CYAN}omarchy-shell shell rescanPlugins${RESET}"
+    say "  3. Enable Omarchy dock plugin: ${CYAN}omarchy plugin enable org.ubermetroid.dockd${RESET}"
+    say "  4. Restart Omarchy shell:      ${CYAN}omarchy restart shell${RESET}"
 fi
 say "  To uninstall cleanly:          ${CYAN}dockd-uninstall${RESET} (or: ${CYAN}dockd-uninstall --purge${RESET})"

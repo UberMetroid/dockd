@@ -1,7 +1,7 @@
 %{!?_userunitdir: %global _userunitdir %{_prefix}/lib/systemd/user}
 
 Name:           dockd
-Version:        0.1.3
+Version:        0.1.4
 Release:        1%{?dist}
 Summary:        Pure-standard-library Rust application dock and window manager daemon for Omarchy
 

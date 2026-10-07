@@ -6,10 +6,10 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "components"
 
-PanelWindow {
+Item {
     id: root
 
-    // Host properties injected by Omarchy Shell
+    // Host properties injected by Omarchy Shell host
     property var shell: null
     property var manifest: null
 
@@ -66,27 +66,10 @@ PanelWindow {
     readonly property real slotDimension: dockSize === "small" ? 40 : (dockSize === "large" ? 58 : 48)
     readonly property real iconDimension: dockSize === "small" ? 28 : (dockSize === "large" ? 44 : 36)
 
-    // Layer-shell geometry: centered horizontally at bottom of screen with floating margin
-    anchors {
-        bottom: true
-    }
-    margins {
-        bottom: 8
-    }
-    exclusiveZone: -1
-
-    WlrLayershell.layer: root.autoHide ? WlrLayer.Overlay : WlrLayer.Top
-    WlrLayershell.namespace: "dockd"
-
-    implicitWidth: dockBar.implicitWidth + 32
-    implicitHeight: root.dockHeight + 20
-
-    color: "transparent"
-
     // Intellihide: hides when windows exist on screen, reveals on mouse proximity or empty desktop
     readonly property bool isDockHidden: {
         if (!root.autoHide) return false
-        if (root.proximityActive || dockHoverArea.containsMouse || settingsPopup.visible || appMenu.visible) return false
+        if (root.proximityActive || (dockPanelWindow && dockPanelWindow.isHovered) || (dockPanelWindow && dockPanelWindow.isPopupOpen)) return false
         return (root.overlap || root.hasWindows)
     }
 
@@ -96,62 +79,43 @@ PanelWindow {
         interval: 350
         repeat: false
         onTriggered: {
-            if (!dockHoverArea.containsMouse && !proximityTrigger.containsMouse) {
+            if (!dockPanelWindow.isHovered && !dockPanelWindow.isProximityTriggered) {
                 root.proximityActive = false
             }
         }
     }
 
-    // Screen edge proximity trigger spanning the bottom area
-    MouseArea {
-        id: proximityTrigger
-        anchors.fill: parent
-        hoverEnabled: true
-        acceptedButtons: Qt.NoButton
-        z: 1
-        onEntered: {
-            autohideTimer.stop()
-            root.proximityActive = true
-        }
-        onExited: {
-            autohideTimer.restart()
-        }
-    }
+    // The Persistent Layer-Shell Dock Window
+    PanelWindow {
+        id: dockPanelWindow
 
-    // Background macOS frosted glass pill
-    Rectangle {
-        id: dockBar
-        anchors.centerIn: parent
-        height: root.dockHeight
-        implicitWidth: contentRow.implicitWidth + 18
-        width: implicitWidth
-        z: 2
+        readonly property bool isHovered: dockHoverArea.containsMouse
+        readonly property bool isProximityTriggered: proximityTrigger.containsMouse
+        readonly property bool isPopupOpen: (settingsPopup && settingsPopup.visible) || (appMenu && appMenu.visible)
 
-        radius: 18
-        color: (root.theme && root.theme.background)
-            ? Qt.rgba(0.08, 0.11, 0.16, 0.78)
-            : Qt.rgba(0.08, 0.11, 0.16, 0.78)
-        border.color: (root.theme && root.theme.border)
-            ? root.theme.border
-            : Qt.rgba(1, 1, 1, 0.15)
-        border.width: 1
-
-        opacity: root.isDockHidden ? 0.0 : 1.0
-        transform: Translate {
-            y: root.isDockHidden ? (root.height + 12) : 0
-            Behavior on y {
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-            }
+        anchors {
+            bottom: true
         }
-        Behavior on opacity {
-            NumberAnimation { duration: 180 }
+        margins {
+            bottom: 8
         }
+        exclusiveZone: -1
 
+        WlrLayershell.layer: root.autoHide ? WlrLayer.Overlay : WlrLayer.Top
+        WlrLayershell.namespace: "dockd"
+
+        implicitWidth: dockBar.implicitWidth + 32
+        implicitHeight: root.dockHeight + 20
+
+        color: "transparent"
+
+        // Screen edge proximity trigger spanning the bottom area
         MouseArea {
-            id: dockHoverArea
+            id: proximityTrigger
             anchors.fill: parent
             hoverEnabled: true
-            acceptedButtons: Qt.RightButton
+            acceptedButtons: Qt.NoButton
+            z: 1
             onEntered: {
                 autohideTimer.stop()
                 root.proximityActive = true
@@ -159,249 +123,292 @@ PanelWindow {
             onExited: {
                 autohideTimer.restart()
             }
-            onClicked: function(mouse) {
-                if (mouse.button === Qt.RightButton) {
-                    settingsPopup.popup(dockBar, mouse.x, mouse.y)
-                }
-            }
         }
 
-        RowLayout {
-            id: contentRow
+        // Background macOS frosted glass pill
+        Rectangle {
+            id: dockBar
             anchors.centerIn: parent
-            spacing: 6
+            height: root.dockHeight
+            implicitWidth: contentRow.implicitWidth + 18
+            width: implicitWidth
+            z: 2
 
-            // 1. App Launcher / Launchpad Button
-            Item {
-                id: launcherBtn
-                width: root.slotDimension
-                height: root.slotDimension
-                Layout.alignment: Qt.AlignVCenter
+            radius: 18
+            color: (root.theme && root.theme.background)
+                ? Qt.rgba(0.08, 0.11, 0.16, 0.78)
+                : Qt.rgba(0.08, 0.11, 0.16, 0.78)
+            border.color: (root.theme && root.theme.border)
+                ? root.theme.border
+                : Qt.rgba(1, 1, 1, 0.15)
+            border.width: 1
 
-                Rectangle {
-                    id: launcherPlate
-                    anchors.centerIn: parent
-                    width: root.slotDimension - 8
-                    height: root.slotDimension - 8
-                    radius: 12
-                    color: launcherMouse.containsMouse
-                        ? ((root.theme && root.theme.accent) ? Qt.rgba(0.22, 0.74, 0.97, 0.25) : Qt.rgba(1, 1, 1, 0.18))
-                        : Qt.rgba(1, 1, 1, 0.08)
-                    border.color: launcherMouse.containsMouse
-                        ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
-                        : Qt.rgba(1, 1, 1, 0.12)
-                    border.width: 1
+            opacity: root.isDockHidden ? 0.0 : 1.0
+            transform: Translate {
+                y: root.isDockHidden ? (dockPanelWindow.height + 12) : 0
+                Behavior on y {
+                    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                }
+            }
+            Behavior on opacity {
+                NumberAnimation { duration: 180 }
+            }
 
-                    scale: launcherMouse.pressed ? 0.92 : (launcherMouse.containsMouse && root.magnification ? 1.18 : 1.0)
-                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-
-                    transform: Translate {
-                        y: (root.magnification && launcherMouse.containsMouse && !launcherMouse.pressed) ? -4 : 0
-                        Behavior on y { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            MouseArea {
+                id: dockHoverArea
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.RightButton
+                onEntered: {
+                    autohideTimer.stop()
+                    root.proximityActive = true
+                }
+                onExited: {
+                    autohideTimer.restart()
+                }
+                onClicked: function(mouse) {
+                    if (mouse.button === Qt.RightButton) {
+                        settingsPopup.popup(dockBar, mouse.x, mouse.y)
                     }
+                }
+            }
 
-                    // 9-dot silver grid icon (macOS Launchpad style)
-                    Grid {
+            RowLayout {
+                id: contentRow
+                anchors.centerIn: parent
+                spacing: 6
+
+                // 1. App Launcher / Launchpad Button
+                Item {
+                    id: launcherBtn
+                    width: root.slotDimension
+                    height: root.slotDimension
+                    Layout.alignment: Qt.AlignVCenter
+
+                    Rectangle {
+                        id: launcherPlate
                         anchors.centerIn: parent
-                        columns: 3
-                        spacing: 3
+                        width: root.slotDimension - 8
+                        height: root.slotDimension - 8
+                        radius: 12
+                        color: launcherMouse.containsMouse
+                            ? ((root.theme && root.theme.accent) ? Qt.rgba(0.22, 0.74, 0.97, 0.25) : Qt.rgba(1, 1, 1, 0.18))
+                            : Qt.rgba(1, 1, 1, 0.08)
+                        border.color: launcherMouse.containsMouse
+                            ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
+                            : Qt.rgba(1, 1, 1, 0.12)
+                        border.width: 1
 
-                        Repeater {
-                            model: 9
-                            Rectangle {
-                                width: 3.5
-                                height: 3.5
-                                radius: 1.75
-                                color: launcherMouse.containsMouse
-                                    ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
-                                    : "#ffffff"
+                        scale: launcherMouse.pressed ? 0.92 : (launcherMouse.containsMouse && root.magnification ? 1.18 : 1.0)
+                        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+
+                        transform: Translate {
+                            y: (root.magnification && launcherMouse.containsMouse && !launcherMouse.pressed) ? -4 : 0
+                            Behavior on y { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                        }
+
+                        // 9-dot silver grid icon (macOS Launchpad style)
+                        Grid {
+                            anchors.centerIn: parent
+                            columns: 3
+                            spacing: 3
+
+                            Repeater {
+                                model: 9
+                                Rectangle {
+                                    width: 3.5
+                                    height: 3.5
+                                    radius: 1.75
+                                    color: launcherMouse.containsMouse
+                                        ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
+                                        : "#ffffff"
+                                }
                             }
                         }
                     }
+
+                    MouseArea {
+                        id: launcherMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: function(mouse) {
+                            if (mouse.button === Qt.LeftButton) {
+                                dockRpc.launchAppDrawer()
+                            } else {
+                                settingsPopup.popup(launcherBtn, mouse.x, mouse.y)
+                            }
+                        }
+                    }
+
+                    ToolTip.visible: launcherMouse.containsMouse
+                    ToolTip.text: "Applications (Launchpad)"
+                    ToolTip.delay: 300
                 }
 
-                MouseArea {
-                    id: launcherMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    onClicked: function(mouse) {
-                        if (mouse.button === Qt.LeftButton) {
-                            dockRpc.launchAppDrawer()
-                        } else {
-                            settingsPopup.popup(launcherBtn, mouse.x, mouse.y)
+                // Separator after App Launcher
+                Rectangle {
+                    width: 1
+                    height: Math.round(root.dockHeight * 0.45)
+                    color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.15)
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.leftMargin: 2
+                    Layout.rightMargin: 2
+                }
+
+                // 2. Application launcher & running window icons
+                Repeater {
+                    model: root.dockItems
+
+                    delegate: DockIcon {
+                        desktopId: modelData.desktop_id || ""
+                        name: modelData.name || ""
+                        iconPath: modelData.icon_path || ""
+                        running: modelData.running || false
+                        focused: modelData.focused || false
+                        urgent: modelData.urgent || false
+                        windows: modelData.windows || []
+                        theme: root.theme
+                        activeCount: modelData.active_count || 0
+                        badgeCount: modelData.badge_count || 0
+                        profile: root.profile
+                        slotSize: root.slotDimension
+                        iconSize: root.iconDimension
+                        magnification: root.magnification
+                        showIndicators: root.showIndicators
+
+                        onClicked: {
+                            dockRpc.sendAction("toggle", { desktop_id: modelData.desktop_id })
+                        }
+                        onMiddleClicked: {
+                            dockRpc.sendAction("launch", { desktop_id: modelData.desktop_id })
+                        }
+                        onRightClicked: function(mx, my) {
+                            appMenu.itemData = modelData
+                            appMenu.popup(this, mx, my)
+                        }
+                        onFocusWindow: function(addr) {
+                            dockRpc.sendAction("focus", { address: addr })
+                        }
+                        onCloseWindow: function(addr) {
+                            dockRpc.sendAction("close", { address: addr })
                         }
                     }
                 }
 
-                ToolTip.visible: launcherMouse.containsMouse
-                ToolTip.text: "Applications (Launchpad)"
-                ToolTip.delay: 300
-            }
-
-            // Separator after App Launcher
-            Rectangle {
-                width: 1
-                height: Math.round(root.dockHeight * 0.45)
-                color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.15)
-                Layout.alignment: Qt.AlignVCenter
-                Layout.leftMargin: 2
-                Layout.rightMargin: 2
-            }
-
-            // 2. Application launcher & running window icons
-            Repeater {
-                model: root.dockItems
-
-                delegate: DockIcon {
-                    desktopId: modelData.desktop_id || ""
-                    name: modelData.name || ""
-                    iconPath: modelData.icon_path || ""
-                    running: modelData.running || false
-                    focused: modelData.focused || false
-                    urgent: modelData.urgent || false
-                    windows: modelData.windows || []
-                    theme: root.theme
-                    activeCount: modelData.active_count || 0
-                    badgeCount: modelData.badge_count || 0
-                    profile: root.profile
-                    slotSize: root.slotDimension
-                    iconSize: root.iconDimension
-                    magnification: root.magnification
-                    showIndicators: root.showIndicators
-
-                    onClicked: {
-                        dockRpc.sendAction("toggle", { desktop_id: modelData.desktop_id })
-                    }
-                    onMiddleClicked: {
-                        dockRpc.sendAction("launch", { desktop_id: modelData.desktop_id })
-                    }
-                    onRightClicked: function(mx, my) {
-                        appMenu.itemData = modelData
-                        appMenu.popup(this, mx, my)
-                    }
-                    onFocusWindow: function(addr) {
-                        dockRpc.sendAction("focus", { address: addr })
-                    }
-                    onCloseWindow: function(addr) {
-                        dockRpc.sendAction("close", { address: addr })
-                    }
-                }
-            }
-
-            // Separator before Quick Settings
-            Rectangle {
-                width: 1
-                height: Math.round(root.dockHeight * 0.45)
-                color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.15)
-                Layout.alignment: Qt.AlignVCenter
-                Layout.leftMargin: 2
-                Layout.rightMargin: 2
-            }
-
-            // 3. Quick Settings Button
-            Item {
-                id: settingsBtn
-                width: root.slotDimension
-                height: root.slotDimension
-                Layout.alignment: Qt.AlignVCenter
-
+                // Separator before Quick Settings
                 Rectangle {
-                    id: settingsPlate
-                    anchors.centerIn: parent
-                    width: root.slotDimension - 8
-                    height: root.slotDimension - 8
-                    radius: 12
-                    color: settingsMouse.containsMouse
-                        ? ((root.theme && root.theme.accent) ? Qt.rgba(0.22, 0.74, 0.97, 0.25) : Qt.rgba(1, 1, 1, 0.18))
-                        : Qt.rgba(1, 1, 1, 0.08)
-                    border.color: settingsMouse.containsMouse
-                        ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
-                        : Qt.rgba(1, 1, 1, 0.12)
-                    border.width: 1
+                    width: 1
+                    height: Math.round(root.dockHeight * 0.45)
+                    color: (root.theme && root.theme.border) ? root.theme.border : Qt.rgba(1, 1, 1, 0.15)
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.leftMargin: 2
+                    Layout.rightMargin: 2
+                }
 
-                    scale: settingsMouse.pressed ? 0.92 : (settingsMouse.containsMouse && root.magnification ? 1.18 : 1.0)
-                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                // 3. Quick Settings Button
+                Item {
+                    id: settingsBtn
+                    width: root.slotDimension
+                    height: root.slotDimension
+                    Layout.alignment: Qt.AlignVCenter
 
-                    transform: Translate {
-                        y: (root.magnification && settingsMouse.containsMouse && !settingsMouse.pressed) ? -4 : 0
-                        Behavior on y { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-                    }
-
-                    // Gear / Control Center Sliders Icon
-                    Text {
+                    Rectangle {
+                        id: settingsPlate
                         anchors.centerIn: parent
-                        text: "⚙"
-                        font.pixelSize: Math.round(root.iconDimension * 0.55)
+                        width: root.slotDimension - 8
+                        height: root.slotDimension - 8
+                        radius: 12
                         color: settingsMouse.containsMouse
+                            ? ((root.theme && root.theme.accent) ? Qt.rgba(0.22, 0.74, 0.97, 0.25) : Qt.rgba(1, 1, 1, 0.18))
+                            : Qt.rgba(1, 1, 1, 0.08)
+                        border.color: settingsMouse.containsMouse
                             ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
-                            : "#cbd5e1"
-                    }
-                }
+                            : Qt.rgba(1, 1, 1, 0.12)
+                        border.width: 1
 
-                MouseArea {
-                    id: settingsMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    onClicked: {
-                        settingsPopup.popup(settingsBtn, 0, -settingsPopup.height - 10)
-                    }
-                }
+                        scale: settingsMouse.pressed ? 0.92 : (settingsMouse.containsMouse && root.magnification ? 1.18 : 1.0)
+                        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
-                ToolTip.visible: settingsMouse.containsMouse
-                ToolTip.text: "Dock Preferences"
-                ToolTip.delay: 300
+                        transform: Translate {
+                            y: (root.magnification && settingsMouse.containsMouse && !settingsMouse.pressed) ? -4 : 0
+                            Behavior on y { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "⚙"
+                            font.pixelSize: Math.round(root.iconDimension * 0.55)
+                            color: settingsMouse.containsMouse
+                                ? ((root.theme && root.theme.accent) ? root.theme.accent : "#38bdf8")
+                                : "#cbd5e1"
+                        }
+                    }
+
+                    MouseArea {
+                        id: settingsMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: {
+                            settingsPopup.popup(settingsBtn, 0, -settingsPopup.height - 10)
+                        }
+                    }
+
+                    ToolTip.visible: settingsMouse.containsMouse
+                    ToolTip.text: "Dock Preferences"
+                    ToolTip.delay: 300
+                }
             }
         }
-    }
 
-    // Context Menu for Window Management Actions & Pinning
-    AppMenu {
-        id: appMenu
-        onActionTriggered: function(action, params) {
-            dockRpc.sendAction(action, params)
-        }
-    }
-
-    // macOS Style Dock Preferences Popup
-    SettingsPopup {
-        id: settingsPopup
-        dockSize: root.dockSize
-        magnification: root.magnification
-        autoHide: root.autoHide
-        showIndicators: root.showIndicators
-        filterCurrentMonitor: root.filterMonitor
-        theme: root.theme
-
-        onDockSizeChanged: function(size) {
-            root.dockSize = size
-            dockRpc.sendAction("size", { size: size })
-        }
-        onMagnificationToggled: function(enabled) {
-            root.magnification = enabled
-            dockRpc.sendAction("magnification", { enabled: enabled })
-        }
-        onAutoHideToggled: function(enabled) {
-            root.autoHide = enabled
-            dockRpc.sendAction("autohide", { enabled: enabled })
-        }
-        onShowIndicatorsToggled: function(enabled) {
-            root.showIndicators = enabled
-            dockRpc.sendAction("set_show_indicators", { show_indicators: enabled })
-        }
-        onFilterCurrentMonitorToggled: function(enabled) {
-            root.filterMonitor = enabled
-            if (enabled) {
-                var monId = root.shell?.screen?.id ?? 0
-                dockRpc.sendAction("monitor", { monitor_id: monId.toString() })
-            } else {
-                dockRpc.sendAction("monitor", { monitor_id: "all" })
+        // Context Menu for Window Management Actions & Pinning
+        AppMenu {
+            id: appMenu
+            onActionTriggered: function(action, params) {
+                dockRpc.sendAction(action, params)
             }
         }
-        onResetPinnedTriggered: function() {
-            dockRpc.sendAction("reset", {})
+
+        // macOS Style Dock Preferences Popup
+        SettingsPopup {
+            id: settingsPopup
+            dockSize: root.dockSize
+            magnification: root.magnification
+            autoHide: root.autoHide
+            showIndicators: root.showIndicators
+            filterCurrentMonitor: root.filterMonitor
+            theme: root.theme
+
+            onDockSizeChanged: function(size) {
+                root.dockSize = size
+                dockRpc.sendAction("size", { size: size })
+            }
+            onMagnificationToggled: function(enabled) {
+                root.magnification = enabled
+                dockRpc.sendAction("magnification", { enabled: enabled })
+            }
+            onAutoHideToggled: function(enabled) {
+                root.autoHide = enabled
+                dockRpc.sendAction("autohide", { enabled: enabled })
+            }
+            onShowIndicatorsToggled: function(enabled) {
+                root.showIndicators = enabled
+                dockRpc.sendAction("set_show_indicators", { show_indicators: enabled })
+            }
+            onFilterCurrentMonitorToggled: function(enabled) {
+                root.filterMonitor = enabled
+                if (enabled) {
+                    var monId = root.shell?.screen?.id ?? 0
+                    dockRpc.sendAction("monitor", { monitor_id: monId.toString() })
+                } else {
+                    dockRpc.sendAction("monitor", { monitor_id: "all" })
+                }
+            }
+            onResetPinnedTriggered: function() {
+                dockRpc.sendAction("reset", {})
+            }
         }
     }
 
