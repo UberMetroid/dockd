@@ -23,8 +23,8 @@ BRANCH="main"
 CANONICAL_URL="https://ubermetroid.github.io/dockd"
 GITHUB_URL="https://github.com/${REPO}"
 RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
-VERSION_PIN="v0.1.0"
-RAW_VERSION="0.1.0"
+VERSION_PIN="v0.1.1"
+RAW_VERSION="0.1.1"
 RELEASE_BASE="${GITHUB_URL}/releases/download/${VERSION_PIN}"
 
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ] && [ "${TERM:-dumb}" != "dumb" ]; then
@@ -358,17 +358,28 @@ fi
 
 chmod +x "${BIN_TARGET}/dockd"
 
-# Reload systemd user daemon
+# Reload and enable systemd user socket activation
 if command -v systemctl >/dev/null 2>&1; then
+    info "Activating systemd user socket for dockd..."
     systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user enable --now dockd.socket 2>/dev/null || true
 fi
 
 ok "dockd successfully installed to ${BIN_TARGET}/dockd"
 ok "Omarchy plugin installed to ${PLUGIN_TARGET}"
 ok "systemd units installed to ${SYSTEMD_TARGET}"
 ok "Uninstaller installed to ${BIN_TARGET}/dockd-uninstall"
-say ""
-say "${BOLD}Next Steps:${RESET}"
-say "  1. Start socket activation:    ${CYAN}systemctl --user enable --now dockd.socket${RESET}"
-say "  2. Enable Omarchy dock plugin: ${CYAN}omarchy plugin enable org.ubermetroid.dockd${RESET}"
-say "  3. To uninstall cleanly:       ${CYAN}dockd-uninstall${RESET} (or: ${CYAN}dockd-uninstall --purge${RESET})"
+
+# Auto-enable in Omarchy and restart shell
+if command -v omarchy >/dev/null 2>&1; then
+    info "Enabling dockd plugin in Omarchy..."
+    omarchy plugin enable org.ubermetroid.dockd 2>/dev/null || true
+    omarchy restart shell 2>/dev/null || true
+    ok "Omarchy dock panel is now active at the bottom of your screen!"
+else
+    say ""
+    say "${BOLD}Next Steps:${RESET}"
+    say "  1. Start socket activation:    ${CYAN}systemctl --user enable --now dockd.socket${RESET}"
+    say "  2. Enable Omarchy dock plugin: ${CYAN}omarchy plugin enable org.ubermetroid.dockd${RESET}"
+fi
+say "  To uninstall cleanly:          ${CYAN}dockd-uninstall${RESET} (or: ${CYAN}dockd-uninstall --purge${RESET})"
