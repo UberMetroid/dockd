@@ -130,48 +130,69 @@ dockd profile windows
 
 ## Installation
 
-### 1. Web Installer (Recommended)
+### 1. Universal Web Installer (Recommended)
 One-line automated installation for Omarchy and Hyprland desktops:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/UberMetroid/dockd/main/install.sh | bash
+curl -fsSL https://ubermetroid.github.io/dockd/install.sh | bash
 ```
 
-### 2. Local Source Installation
+### 2. DNF / RPM (Fedora, RHEL, CentOS)
+Install native RPM package directly via the web installer or prebuilt package:
+
+```bash
+# Automated via web installer:
+curl -fsSL https://ubermetroid.github.io/dockd/install.sh | bash -s -- --dnf
+
+# Or install local / downloaded package:
+sudo dnf install ./dist/dockd-0.1.0-1.*.rpm
+```
+
+### 3. DEB / APT (Debian, Ubuntu)
+Install native `.deb` package directly via the web installer or prebuilt package:
+
+```bash
+# Automated via web installer:
+curl -fsSL https://ubermetroid.github.io/dockd/install.sh | bash -s -- --deb
+
+# Or install local / downloaded package:
+sudo apt install ./dist/dockd_0.1.0-1_*.deb
+```
+
+### 4. Arch Linux & Omarchy (PKGBUILD / Pacman)
+Omarchy runs natively on Arch Linux. Build and install via PKGBUILD:
+
+```bash
+# Automated via web installer:
+curl -fsSL https://ubermetroid.github.io/dockd/install.sh | bash -s -- --pkgbuild
+
+# Or build from source checkout:
+cd packaging/arch && makepkg -si
+```
+
+### 5. Local Source Installation
 From a clone of this repository:
 
 ```bash
 ./install.sh
 ```
 
-### 3. DNF / RPM (Fedora, RHEL)
-Install via the prebuilt RPM package or generate it with the built-in packaging script:
+---
+
+## Uninstallation
+
+Cleanly remove `dockd`, systemd user units, sockets, and Omarchy plugins:
 
 ```bash
-# Build the native RPM package
-bash packaging/build-packages.sh
+# 1. Via installed CLI helper (if already installed)
+dockd-uninstall
 
-# Install with DNF
-sudo dnf install ./dist/dockd-0.1.0-1.*.rpm
-```
+# 2. Via canonical web uninstaller
+curl -fsSL https://ubermetroid.github.io/dockd/uninstall.sh | bash
 
-### 4. DEB / APT (Debian, Ubuntu)
-Install via the native `.deb` package:
-
-```bash
-# Build the native Debian package
-bash packaging/build-packages.sh
-
-# Install with APT
-sudo apt install ./dist/dockd_0.1.0-1_*.deb
-```
-
-### 5. Arch Linux / Omarchy (PKGBUILD)
-Omarchy runs natively on Arch Linux. Build and install directly using `makepkg`:
-
-```bash
-cd packaging/arch
-makepkg -si
+# 3. Complete purge (including pinned app configuration)
+dockd-uninstall --purge
+# or: curl -fsSL https://ubermetroid.github.io/dockd/uninstall.sh | bash -s -- --purge
 ```
 
 ---
